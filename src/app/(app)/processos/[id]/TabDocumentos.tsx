@@ -100,7 +100,7 @@ function ItemDocumental({
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
           <label htmlFor={idSel} className="text-sm font-medium text-ink">
             {item.label}
           </label>
@@ -110,7 +110,7 @@ function ItemDocumental({
           id={idSel}
           value={item.status}
           disabled={pendente || bloqueado}
-          className={cn("h-9 w-auto min-w-[12rem] text-sm font-medium", COR_ITEM[item.status])}
+          className={cn("h-9 min-w-0 flex-1 text-sm font-medium sm:w-auto sm:min-w-[12rem] sm:flex-none", COR_ITEM[item.status])}
           onChange={(e) => {
             const novo = e.target.value;
             const anterior = item.status;
