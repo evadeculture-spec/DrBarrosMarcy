@@ -131,6 +131,7 @@ function ItemDocumental({
               type="file"
               className="sr-only"
               id={`up-${item.id}`}
+              aria-label={`Ficheiro para «${item.label}»`}
               tabIndex={-1}
               onChange={(e) => {
                 const f = e.target.files?.[0];

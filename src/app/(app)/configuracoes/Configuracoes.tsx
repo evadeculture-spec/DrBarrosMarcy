@@ -302,6 +302,7 @@ function ExportarRestaurar() {
         <input
           ref={ficheiro}
           id="restaurar-ficheiro"
+          aria-label="Ficheiro de exportação de processo"
           type="file"
           accept="application/json,.json"
           className="sr-only"
