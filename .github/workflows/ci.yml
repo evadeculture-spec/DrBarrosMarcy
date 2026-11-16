@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-apenas-local
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: ci-apenas-local
+      DATABASE_APP_ROLE: sf_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Papéis e bases de dados (contentor descartável)
+        run: |
+          psql -h localhost -U postgres -c "create role sf_owner login password 'ci-dono'"
+          psql -h localhost -U postgres -c "create role sf_app login password 'ci-app'"
+          psql -h localhost -U postgres -c "create database solicitaflow_test owner sf_owner"
+          psql -h localhost -U postgres -c "create database solicitaflow_e2e owner sf_owner"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Testes (servidor + base de dados)
+        run: npm test
+        env:
+          DATABASE_URL: postgres://sf_app:ci-app@localhost:5432/solicitaflow_test
+          DATABASE_ADMIN_URL: postgres://sf_owner:ci-dono@localhost:5432/solicitaflow_test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Testes no browser
+        run: npm run test:e2e
+        env:
+          DATABASE_URL: postgres://sf_app:ci-app@localhost:5432/solicitaflow_e2e
+          DATABASE_ADMIN_URL: postgres://sf_owner:ci-dono@localhost:5432/solicitaflow_e2e
+          SEED_DEMO_PASSWORD: ci-palavra-passe-demo
