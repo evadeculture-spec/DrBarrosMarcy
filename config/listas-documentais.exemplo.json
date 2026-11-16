@@ -1,0 +1,62 @@
+{
+  "_nota": "Listas documentais de EXEMPLO. Não são requisitos legais confirmados: cada escritório deve revê-las e ajustá-las em Configurações.",
+  "tiposDeProcesso": [
+    {
+      "chave": "registo_predial",
+      "nome": "Registo predial",
+      "documentos": [
+        { "nome": "Certidão permanente do prédio", "obrigatorio": true },
+        { "nome": "Caderneta predial", "obrigatorio": true },
+        { "nome": "Documento de identificação", "obrigatorio": true },
+        { "nome": "Título aquisitivo", "obrigatorio": true },
+        { "nome": "Comprovativo de pagamento de taxas", "obrigatorio": false }
+      ]
+    },
+    {
+      "chave": "habilitacao_herdeiros",
+      "nome": "Habilitação de herdeiros",
+      "documentos": [
+        { "nome": "Certidão de óbito", "obrigatorio": true },
+        { "nome": "Documentos de identificação dos herdeiros", "obrigatorio": true },
+        { "nome": "Certidões de nascimento dos herdeiros", "obrigatorio": true },
+        { "nome": "Relação de bens", "obrigatorio": false }
+      ]
+    },
+    {
+      "chave": "procuracao",
+      "nome": "Procuração",
+      "documentos": [
+        { "nome": "Documento de identificação do mandante", "obrigatorio": true },
+        { "nome": "Dados do mandatário", "obrigatorio": true },
+        { "nome": "Descrição dos poderes a conferir", "obrigatorio": true }
+      ]
+    },
+    {
+      "chave": "arrendamento",
+      "nome": "Contrato de arrendamento",
+      "documentos": [
+        { "nome": "Documento de identificação do senhorio", "obrigatorio": true },
+        { "nome": "Documento de identificação do arrendatário", "obrigatorio": true },
+        { "nome": "Caderneta predial urbana", "obrigatorio": true },
+        { "nome": "Licença de utilização", "obrigatorio": false }
+      ]
+    },
+    {
+      "chave": "nif_nao_residente",
+      "nome": "NIF para não residente",
+      "documentos": [
+        { "nome": "Passaporte ou documento de identificação", "obrigatorio": true },
+        { "nome": "Comprovativo de morada no estrangeiro", "obrigatorio": true },
+        { "nome": "Procuração assinada", "obrigatorio": true }
+      ]
+    }
+  ],
+  "modelos": [
+    {
+      "chave": "pedido_documentos",
+      "nome": "Pedido de documentos em falta",
+      "assunto": "Processo [REFERENCIA] — documentos em falta",
+      "corpo": "Caro(a) [CLIENTE],\n\nPara darmos seguimento ao processo [REFERENCIA] ([PROCESSO]), precisamos ainda dos seguintes documentos:\n\n[DOCUMENTOS_EM_FALTA]\n\nPode responder a este email com os documentos em anexo.\n\nCom os melhores cumprimentos,\n[RESPONSAVEL]\n[ESCRITORIO]"
+    }
+  ]
+}
