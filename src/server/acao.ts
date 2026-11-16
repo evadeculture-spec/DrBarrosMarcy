@@ -19,7 +19,11 @@ export async function executar<T>(fn: (ctx: Ctx) => Promise<T>): Promise<Resulta
     revalidatePath("/", "layout");
     return { ok: true, dados };
   } catch (e) {
-    if (e instanceof ErroNegocio) return { ok: false, erro: e.message };
+    if (e instanceof ErroNegocio) {
+      // Uma recusa pode ter deixado estado registado (ex.: tentativa de envio falhada).
+      revalidatePath("/", "layout");
+      return { ok: false, erro: e.message };
+    }
     if (e instanceof ZodError) return { ok: false, erro: e.issues[0]?.message ?? "Dados inválidos." };
     console.error("[acao]", e);
     return { ok: false, erro: "Ocorreu um erro inesperado. Tente de novo; se persistir, avise o administrador." };
