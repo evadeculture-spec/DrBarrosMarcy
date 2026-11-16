@@ -87,7 +87,7 @@ export async function apagarProcesso(ctx: Ctx, matterId: string) {
   });
 }
 
-const L = z.record(z.unknown());
+const L = z.record(z.string(), z.unknown());
 const ExportacaoSchema = z.object({
   formato: z.literal(FORMATO_PROCESSO),
   versao: z.literal(1),
@@ -121,12 +121,12 @@ export async function restaurarProcesso(
   }
 
   // Verificar o conteúdo de todos os anexos antes de escrever o que quer que seja.
-  const anexos = e.anexos.map((a) => {
+  const anexos = e.anexos.map((a): Linha & { conteudo: Buffer } => {
     const conteudo = Buffer.from(String(a.conteudo_base64 ?? ""), "base64");
     if (sha256(conteudo) !== a.sha256) {
       throw new ErroNegocio(`O anexo «${s(a.filename)}» está corrompido (checksum diferente).`);
     }
-    return { ...a, conteudo };
+    return { ...(a as Linha), conteudo };
   });
 
   return withTenant(ctx, async (tx) => {

@@ -71,7 +71,7 @@ export const TRANSICOES: readonly Transicao[] = [
     manual: { rotulo: "Retomar conferência", papeis: TODOS } },
 
   { de: "resposta_por_conferir", para: "em_conferencia",
-    manual: { rotulo: "Passar a em conferência", papeis: TODOS } },
+    manual: { rotulo: "Voltar a conferir", papeis: TODOS } },
   { de: "resposta_por_conferir", para: "a_aguardar_aprovacao", sistema: true },
   { de: "resposta_por_conferir", para: "completo",
     manual: { rotulo: "Marcar como completo", papeis: TODOS } },
