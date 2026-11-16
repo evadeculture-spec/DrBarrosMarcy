@@ -1,137 +1,111 @@
 # Estado atual do SolicitaFlow
 
-_Levantamento feito em 16/11/2026 sobre o commit `02f981f` (ramo `main`)._
+_Atualizado a 16/11/2026, no fim das fases 0 a 5. O levantamento inicial da
+demo está no fim deste ficheiro._
 
-## Resumo em três linhas
+## Resumo
 
-- É uma **demo só de cliente**: Next.js 14 a correr inteiramente no browser,
-  sem servidor de aplicação, sem base de dados, sem autenticação e sem testes.
-- Os dados vivem em memória (React Context) e **perdem-se ao recarregar a
-  página**; os dados de partida estão fixos em ficheiros `src/data/*.ts`.
-- `npm run lint` e `npm run build` passam (verificado nesta data). Não existe
-  `npm test`.
+- A aplicação tem servidor, base de dados PostgreSQL com isolamento por
+  escritório (RLS), autenticação real e papéis. O login que aceitava qualquer
+  palavra-passe foi removido.
+- O percurso completo funciona: triagem → ficha → pedido ao cliente
+  (aprovação, envio, reenvio) → Hoje → resposta → conclusão.
+- Os 7 critérios de aceitação têm testes automáticos, todos a passar.
 
-## Stack e ferramentas
+## Verificação (16/11/2026)
 
-| Área | O que existe |
+| Verificação | Resultado |
 |---|---|
-| Framework | Next.js 14.2 (App Router), React 18, TypeScript `strict` |
-| Estilos | Tailwind CSS 3 com tokens próprios (bordeaux, ink, muted…) |
-| Componentes | Primitivos feitos à mão em `src/components/ui` (estilo shadcn) |
-| Ícones | `lucide-react` |
-| Estado | `useStore` (React Context em memória), `useSession`, `useUI` |
-| Lint | ESLint `next/core-web-vitals` |
-| Testes | **Nenhum** (nem framework instalado) |
-| Deploy | Vercel (`vercel.json` força o framework Next.js); sem variáveis de ambiente |
-| CI | Nenhum workflow em `.github/` |
+| `npm run lint` | sem avisos |
+| `npm run typecheck` | sem erros |
+| `npm test` (Vitest, Postgres 16 real) | 45/45 |
+| `npm run build` | ok |
+| `npm run test:e2e` (Chromium + axe) | 13/13, incluindo WCAG 2.1 AA em 8 ecrãs a 1280, 768 e 375 px, sem deslocamento horizontal |
+| Percurso manual no browser | Hoje, ficha, triagem, processos, em desktop, tablet e telemóvel; sem erros na consola |
 
-## Estrutura
+## O que existe, por fase
 
-```
-src/
-├─ app/                 páginas (landing, login, grupo (app) com shell)
-├─ components/          componentes de domínio + ui/ + layout/
-├─ data/                dados fictícios fixos (users, clients, matters, tasks,
-│                       documents, timeline, templates)
-├─ hooks/               useStore, useSession, useUI
-├─ lib/                 constants, selectors, checklists, email, security, utils
-├─ types/               tipos de domínio
-└─ utils/date.ts        formatação de datas pt-PT
-```
+**Fase 0 — Fundações.** Esquema em `db/migrations` (RLS `FORCE` em todas as
+tabelas, chaves compostas `(id, organization_id)` para impedir ligações entre
+escritórios, papel da aplicação sem `BYPASSRLS`). Migrações, seed com datas
+relativas a hoje e nomes fictícios (`example.pt`), Vitest, Playwright e CI.
 
-Não há `src/app/api`, nem `middleware.ts`, nem server actions: **todo o
-código corre no browser**.
+**Fase 1 — Ficha.** Faixa fixa calculada no servidor
+(`src/server/domain/faixa.ts`). Lista documental por tipo, editável por
+processo. 8 estados com transições manuais e de sistema validadas no servidor
+(`src/server/domain/estados.ts`). O histórico é imutável: a aplicação não tem
+`UPDATE`/`DELETE` e um gatilho bloqueia até o dono do esquema. Retoma do
+separador e «Continuar em …» na vista Hoje.
 
-## Modelo de dados (apenas tipos TypeScript)
+**Fase 2 — Triagem.** Carregar email (remetente, assunto, texto, anexos até
+15 MB cada e 25 MB por envio). Sugestão de processo pelo email do cliente,
+apenas como sugestão. Associar a um processo e a um documento da lista, mover
+entre processos, «Anular» com fotografia antes/depois (recusa se algo mudou
+entretanto), criar processo a partir de um email, arquivar.
 
-Definido em `src/types/index.ts`. Não existe esquema de base de dados.
+**Fase 3 — Pedido ao cliente.** Rascunho a partir de modelo, com os
+documentos em falta, guardado automaticamente. Só solicitador ou
+administrador aprova. O envio é idempotente: o id do pedido é a chave,
+bloqueado com `FOR UPDATE`, com no máximo uma mensagem saída por pedido
+(chave única) e um pedido em curso por processo. Falha → «Envio falhado» →
+Reenviar. Seguimento automático a 7 dias após o envio.
 
-- `Organization`, `User` (papéis `admin | solicitador | assistente`)
-- `Client` (particular/empresa, NIF, morada)
-- `Matter` (processo): tipo, estado, responsável, prioridade, próxima ação,
-  `dueDate`, honorários, estado de pagamento, `stalledReason`, e a
-  **checklist embebida** (`ChecklistItem[]`)
-- `MatterDocument` (documento com estado; `fileUrl` sempre `null`)
-- `Task`, `TimelineEvent`, `EmailTemplate`
+**Fase 4 — Hoje.** Substitui o Dashboard. Ações da equipa com a linha no
+formato pedido. Seguimento e Prazo são tipos separados: o prazo fica «por
+confirmar» até um solicitador o confirmar, sem alertas nem contadores.
 
-Todas as entidades têm `organizationId`, mas está sempre fixo em
-`CURRENT_ORG_ID = "org-dbm"` (`src/lib/security.ts`) e nunca é verificado.
+**Fase 5 — Escritórios e autenticação.** Escritório resolvido pelo
+subdomínio (`src/middleware.ts`). Sessões na BD (só o hash do token).
+Palavras-passe com scrypt. Papéis triagem / solicitador / administrador.
+Gestão de utilizadores com palavra-passe inicial mostrada uma vez. Novo
+escritório por ficheiro de configuração (`npm run escritorio:ativar`).
+Exportar o escritório; exportar, apagar (com «Anular» que restaura) e
+restaurar um processo com verificação SHA-256.
 
-Estados de processo atuais (9): Novo pedido, A aguardar documentos, Em
-preparação, A aguardar assinatura, Submetido, A aguardar entidade externa,
-Concluído, Faturado, Arquivado. **Nenhum coincide com os 8 estados pedidos.**
+## O que é fictício ou simulado
 
-## Ecrã a ecrã: funciona, é fictício ou é só desenho
+- **Envio de email: simulado.** O modo «registo» guarda a mensagem como
+  enviada sem a fazer sair. Há um botão em Configurações para simular falhas.
+  Falta escolher e ligar um fornecedor (SMTP ou API); a interface `Remetente`
+  em `src/server/services/envio.ts` já recebe a chave de idempotência.
+- Os dados de demonstração (escritórios «demo» e «norte») são fictícios.
 
-Legenda: **Funciona** = tem lógica e altera o estado (em memória) ·
-**Fictício** = mostra dados fixos · **Só desenho** = botão/campo sem efeito.
+## O que ficou por fazer ou tem limites conhecidos
 
-| Ecrã | Funciona | Fictício / só desenho |
-|---|---|---|
-| `/` Landing | Ligações para login | Texto de marketing |
-| `/login` | Escolher um dos 3 perfis grava o id em `localStorage` | **Qualquer palavra-passe é aceite**; o campo nem é lido |
-| `/dashboard` | Contadores calculados a partir do store | Saudação fixa «Bom dia, … 👋» (erra à tarde); 7 contadores, incluindo pagamentos; «processos parados» depende de `stalledReason` escrito à mão |
-| `/processos` | Filtros, vista tabela/kanban, criar processo | Prioridade e honorários fictícios |
-| `/processos/[id]` | Mudar estado (qualquer → qualquer, sem validação), marcar itens da checklist, adicionar tarefa, adicionar nota | Não há faixa «o que falta / quem age»; o histórico só regista notas e a criação (mudar estado ou checklist **não deixa rasto**); separador Comunicações só pré-visualiza/copia texto |
-| `/clientes`, `/clientes/[id]` | Listagem e ficha | Clientes criados só por email no «criar processo» |
-| `/tarefas` | Separadores por prazo, mudar estado | — |
-| `/documentos` | Lista de itens em falta, gerar texto de email | «Gerar email» só copia texto; nada é enviado nem registado |
-| `/templates` | Escolher modelo e pré-visualizar | Edição não é guardada |
-| `/importar` | Lê CSV e valida 2 colunas obrigatórias | **«Importar» só muda um booleano**: nenhum processo é criado |
-| `/configuracoes` | Separadores | Tudo só de leitura ou sem efeito: «Guardar alterações» não faz nada, interruptores de notificações não persistem, listas documentais são as fixas de `src/lib/checklists.ts` |
-| Pesquisa `⌘K` | Pesquisa em memória em processos/clientes | — |
+- **Recuperar palavra-passe por email:** não existe (depende do envio real).
+  Hoje, o administrador desativa o utilizador e cria-o de novo; cada pessoa
+  pode mudar a sua palavra-passe em Configurações.
+- **Limite de tentativas de login:** é em memória, por processo do servidor.
+  Com várias instâncias, deve passar para a base de dados ou para um serviço
+  partilhado.
+- **Ficheiros na base de dados (`bytea`):** escolhido para que o isolamento
+  dos anexos seja imposto pelas mesmas políticas RLS. Serve bem volumes
+  moderados. Para volumes grandes, migrar para armazenamento de objetos com
+  políticas por escritório (ex.: Supabase Storage).
+- **Exportar o escritório:** gera um único JSON em memória. Para escritórios
+  grandes, deve passar a ser gerado por partes (streaming ou ZIP).
+- **Restauro de um processo:** os anexos e o seu conteúdo são idênticos
+  (critério 6). As horas do histórico perdem os microssegundos na exportação
+  e mantêm o milissegundo.
+- **Página de clientes:** foi retirada. Os clientes são criados no «Novo
+  processo» ou na triagem e encontram-se pela pesquisa. Ainda não é possível
+  editar os dados de um cliente.
+- **Estado «A aguardar entidade externa»:** não foi acrescentado (decisão
+  D9 em aberto).
+- **Não verificado:** leitores de ecrã reais (só verificação automática com
+  axe), entrega real de email, DNS e certificados de subdomínios reais (o
+  teste usa `*.localhost`), deploy (precisa de uma base de dados PostgreSQL de
+  produção, que ainda não existe).
 
-Componentes de documentos (`DocumentList`): botão de descarregar sempre
-desativado; não existe carregamento de ficheiros em lado nenhum.
+---
 
-## Regras de negócio que existem
+## Levantamento inicial (antes das fases)
 
-- `src/lib/selectors.ts`: «em falta» = item obrigatório `pendente` ou
-  `rejeitado`; contadores do dashboard; agrupamento por motivo de bloqueio.
-- `src/lib/checklists.ts`: lista documental fixa por tipo de processo.
-- `src/lib/email.ts`: substituição de variáveis `[NOME]`, `[DOCUMENTOS_EM_FALTA]`…
-- `src/lib/security.ts`: `can()` meramente ilustrativo, não usado nas ações.
-
-Tudo corre no cliente. **Não há nenhuma regra imposta no servidor.**
-
-## Dados de demonstração — problemas
-
-1. **Datas fixas em junho de 2026.** Hoje (16/11/2026) aparece «Vencido há
-   ~150 dias» em quase tudo, que é exatamente o que o produto deve evitar.
-2. **Identidade do escritório possivelmente real.** `src/data/users.ts` tem
-   «Dr. Barros & Marcy — Solicitadoria» com NIF, morada em Castelo Branco,
-   telefone e domínio `barrosmarcy.pt`; o nome coincide com o do repositório.
-   Se for um escritório real, estes dados não devem estar no código (ver
-   pergunta no plano).
-3. **Clientes com nomes e emails não fictícios na forma.** Ex.:
-   `k.jasinska@gmail.com`, `pierre.bodin@orange.fr`, domínios reais;
-   nomes maioritariamente estrangeiros. O pedido é «nomes portugueses
-   fictícios»; os emails devem usar domínios reservados (`example.pt`).
-4. NIF e telefones com formato válido. Não verifiquei se pertencem a alguém;
-   devem ser substituídos por valores claramente fictícios.
-
-## Qualidade da interface — lacunas observadas
-
-- Termos em inglês: «Dashboard», «Templates», «kanban».
-- **Sete** pontos de entrada para criar processo (topbar ×2, dashboard,
-  cabeçalho e estado vazio de Processos, landing…).
-- `Label` não está associado aos campos (sem `htmlFor`/`id`): os leitores de
-  ecrã não anunciam os rótulos.
-- O estado da checklist é um `<select>` colorido: tem texto, mas o ícone
-  redondo ao lado é só cor.
-- Não há estados de carregamento nem de erro (não há pedidos à rede).
-- Não há rascunhos, nem «Anular», nem retoma do ponto onde se estava.
-
-## Segurança
-
-- Proteção de rotas apenas no cliente (`AppShell` redireciona se não houver
-  id no `localStorage`). Basta escrever um id para «entrar».
-- Sem segredos no repositório (verificado: não há `.env` versionado).
-- Sem isolamento entre escritórios.
-
-## O que se aproveita
-
-- Tokens visuais, primitivos de UI e o layout responsivo (sidebar/topbar).
-- Os tipos de domínio como ponto de partida para o esquema.
-- Formatação de datas pt-PT e a função de preenchimento de modelos.
-- As listas documentais como **dados iniciais configuráveis**, não como regra.
+O ponto de partida, a 16/11/2026 (commit `02f981f`), era uma demo só de
+cliente: Next.js no browser, dados fictícios fixos em `src/data` com datas de
+junho de 2026, React Context em memória, login que aceitava qualquer
+palavra-passe e nenhum teste. Também tinha botões sem efeito («Importar»,
+«Guardar» nas Configurações, edição de modelos), 9 estados diferentes dos
+pedidos e a identidade de um escritório com NIF, morada e telefone, e emails
+de clientes em domínios reais. Esse código foi substituído; o histórico git
+guarda-o.

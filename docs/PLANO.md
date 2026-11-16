@@ -1,7 +1,26 @@
 # Plano por fases — SolicitaFlow
 
-_Proposta de 16/11/2026. Nada além deste documento e de `docs/ESTADO.md` foi
-alterado. Aguarda aprovação antes da Fase 0/1._
+_Proposta de 16/11/2026, aprovada no mesmo dia («quero um MVP funcional de
+qualidade mundial»). As fases 0 a 5 foram implementadas; o estado está em
+`docs/ESTADO.md`._
+
+## Decisões tomadas na implementação
+
+| # | Decisão | Nota |
+|---|---|---|
+| D1 | **PostgreSQL com RLS, sem dependência de um fornecedor.** Funciona em Supabase, Neon, RDS ou num Postgres próprio. | Ajuste ao plano: em vez de Supabase Auth e Supabase Storage, a autenticação (scrypt + sessões na BD) e os anexos (`bytea` sob RLS) ficaram na própria BD. Assim tudo se testa localmente e o isolamento dos ficheiros é imposto pelas mesmas políticas. |
+| D2 | Regras no servidor (`src/server/domain` + `services`), reforçadas na BD. | Como proposto. |
+| D3 | Isolamento por escritório desde a Fase 0. | A autenticação real também ficou pronta, por isso a ressalva de «não usar dados reais antes da Fase 5» já não se aplica. Os limites conhecidos estão em `ESTADO.md`. |
+| D4 | Estados antigos substituídos. | Os dados eram fictícios; não houve migração destrutiva. |
+| D5 | Honorários, prioridade, kanban, Importar, Tarefas, Documentos em falta e Clientes retirados da interface. | Tarefas e Documentos em falta foram absorvidos por Hoje e pela faixa. |
+| D6 | Escritório e clientes de demonstração substituídos por dados fictícios (`example.pt`). | Sem confirmação de que o escritório anterior era real; tratado como tal por precaução. |
+| D7 | Envio em modo «registo» (simulado), com a interface pronta para um fornecedor real. | Falta escolher o fornecedor. |
+| D8 | Papéis e permissões como na tabela proposta. | Também validados na BD para apagar processos. |
+| D9 | «A aguardar entidade externa» **não** foi acrescentado. | Continua em aberto. |
+
+Dependências acrescentadas: `postgres`, `zod` (execução); `vitest`, `tsx`,
+`@playwright/test`, `@axe-core/playwright` (desenvolvimento). Não foram
+usadas `@supabase/*` nem a CLI da Supabase.
 
 > Promessa: **«Sabe sempre o que falta em cada processo, quem tem de agir e
 > desde quando.»** Cada fase abaixo diz como a serve.
