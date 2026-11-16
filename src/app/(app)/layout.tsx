@@ -1,9 +1,23 @@
-import { AppShell } from "@/components/layout/AppShell";
+import { exigirSessao } from "@/server/sessao";
+import { withTenant } from "@/server/db";
+import { PAPEL_ROTULO } from "@/server/domain/papeis";
+import { Shell } from "./Shell";
 
-export default function AppGroupLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <AppShell>{children}</AppShell>;
+export const dynamic = "force-dynamic";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const s = await exigirSessao();
+  const [{ n }] = await withTenant(s.ctx, (tx) => tx<{ n: number }[]>`
+    select count(*)::int as n from attachments a
+    left join inbox_messages e on e.id = a.inbox_message_id
+    where a.matter_id is null and e.archived_at is null`);
+  return (
+    <Shell
+      escritorio={s.escritorio.name}
+      utilizador={{ nome: s.utilizador.name, papel: PAPEL_ROTULO[s.utilizador.role] }}
+      porTriar={n}
+    >
+      {children}
+    </Shell>
+  );
 }
