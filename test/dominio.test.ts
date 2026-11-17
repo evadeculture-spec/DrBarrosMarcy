@@ -11,6 +11,7 @@ import { calcularHoje, linhaProcesso, type ProcessoHoje } from "../src/server/do
 import { slugDoHost } from "../src/server/domain/subdominio";
 import { preencherModelo } from "../src/server/domain/modelos";
 import { diaLisboa, somarDias, formatarData } from "../src/server/domain/datas";
+import { rotuloPapel } from "../src/server/domain/papeis";
 
 describe("máquina de estados", () => {
   it("recusa qualquer transição que não esteja na tabela", () => {
@@ -157,5 +158,14 @@ describe("utilitários", () => {
     expect(diaLisboa(new Date("2026-07-16T23:30:00Z"))).toBe("2026-07-17");
     expect(somarDias("2026-12-30", 3)).toBe("2027-01-02");
     expect(formatarData("2026-11-05")).toBe("05/11/2026");
+  });
+});
+
+describe("rótulo do papel", () => {
+  it("usa a forma de tratamento escolhida e é neutro sem ela", () => {
+    expect(rotuloPapel("solicitador", "feminino")).toBe("Solicitadora");
+    expect(rotuloPapel("administrador", "feminino")).toBe("Administradora");
+    expect(rotuloPapel("solicitador", "masculino")).toBe("Solicitador");
+    expect(rotuloPapel("solicitador", null)).toBe("Solicitador");
   });
 });

@@ -29,3 +29,16 @@ const MATRIZ: Record<Permissao, readonly Papel[]> = {
 export function pode(papel: Papel, permissao: Permissao): boolean {
   return MATRIZ[permissao].includes(papel);
 }
+
+export type FormaTratamento = "masculino" | "feminino";
+
+const ROTULO_FEMININO: Record<Papel, string> = {
+  triagem: "Triagem",
+  solicitador: "Solicitadora",
+  administrador: "Administradora",
+};
+
+/** Rótulo do papel conforme a forma de tratamento escolhida (neutro se não houver). */
+export function rotuloPapel(papel: Papel, forma?: FormaTratamento | null): string {
+  return forma === "feminino" ? ROTULO_FEMININO[papel] : PAPEL_ROTULO[papel];
+}

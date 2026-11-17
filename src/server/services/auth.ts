@@ -5,7 +5,7 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { db, withTenant, type Tx } from "../db";
-import type { Papel } from "../domain/papeis";
+import type { FormaTratamento, Papel } from "../domain/papeis";
 
 const scryptAsync = promisify(scrypt) as (
   password: string,
@@ -111,6 +111,7 @@ export interface Utilizador {
   name: string;
   email: string;
   role: Papel;
+  forma_tratamento: FormaTratamento | null;
 }
 
 export async function utilizadorDaSessao(
@@ -119,7 +120,7 @@ export async function utilizadorDaSessao(
 ): Promise<Utilizador | null> {
   return withTenant({ orgId }, async (tx) => {
     const [u] = await tx<Utilizador[]>`
-      select u.id, u.name, u.email, u.role
+      select u.id, u.name, u.email, u.role, u.forma_tratamento
       from sessions s join users u on u.id = s.user_id
       where s.token_hash = ${hashToken(token)}
         and s.expires_at > now() and u.active`;

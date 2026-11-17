@@ -6,7 +6,7 @@ import { Download, Trash2, Upload } from "lucide-react";
 import { useAcao } from "@/components/useAcao";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
-import { PAPEIS, PAPEL_ROTULO, type Papel } from "@/server/domain/papeis";
+import { PAPEIS, PAPEL_ROTULO, rotuloPapel, type FormaTratamento, type Papel } from "@/server/domain/papeis";
 import type { TipoConfig } from "@/server/services/configuracao";
 import { restaurarProcessoAcao } from "../processos/acoes";
 import {
@@ -16,6 +16,7 @@ import {
   alternarObrigatorioAcao,
   criarUtilizadorAcao,
   definirAtivoAcao,
+  formaTratamentoAcao,
   mudarPalavraPasseAcao,
   removerRequisitoAcao,
   reporRequisitoAcao,
@@ -28,6 +29,7 @@ interface Utilizador {
   email: string;
   role: Papel;
   active: boolean;
+  forma_tratamento: FormaTratamento | null;
 }
 
 function Seccao({ id, titulo, descricao, children }: { id: string; titulo: string; descricao?: string; children: React.ReactNode }) {
@@ -195,6 +197,25 @@ function Utilizadores({ utilizadores, eu }: { utilizadores: Utilizador[]; eu: st
               {PAPEIS.map((p) => (
                 <option key={p} value={p}>{PAPEL_ROTULO[p]}</option>
               ))}
+            </Select>
+            <label className="sr-only" htmlFor={`forma-${u.id}`}>Forma de tratamento de {u.name}</label>
+            <Select
+              id={`forma-${u.id}`}
+              className="h-9 w-auto"
+              value={u.forma_tratamento ?? ""}
+              disabled={pendente}
+              onChange={(e) => {
+                const anterior = u.forma_tratamento;
+                const forma = (e.target.value || null) as FormaTratamento | null;
+                correr(() => formaTratamentoAcao(u.id, forma), {
+                  sucesso: `${u.name}: ${rotuloPapel(u.role, forma)}.`,
+                  anular: () => formaTratamentoAcao(u.id, anterior),
+                });
+              }}
+            >
+              <option value="">Tratamento neutro</option>
+              <option value="masculino">Masculino</option>
+              <option value="feminino">Feminino</option>
             </Select>
             {u.id !== eu && (
               <Button

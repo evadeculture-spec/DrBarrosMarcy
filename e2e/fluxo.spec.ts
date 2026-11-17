@@ -69,6 +69,13 @@ test("entrada rápida da demonstração: um clique, sem palavra-passe", async ({
   await expect(page.getByText(/Administrador ·/)).toBeVisible();
 });
 
+test("menu mostra «Solicitadora» para a Márcia Raposo", async ({ page }) => {
+  await page.goto("/entrar");
+  await page.getByRole("button", { name: /Márcia Raposo/ }).click();
+  await expect(page).toHaveURL(/\/hoje$/);
+  await expect(page.getByText(/^Solicitadora ·/)).toBeVisible();
+});
+
 test("entrada rápida não existe fora do escritório de demonstração", async ({ page }) => {
   await page.goto("http://norte.localhost:3100/entrar");
   await expect(page.getByText("Entrada rápida")).toHaveCount(0);

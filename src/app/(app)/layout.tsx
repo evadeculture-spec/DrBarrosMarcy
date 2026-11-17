@@ -1,6 +1,6 @@
 import { exigirSessao } from "@/server/sessao";
 import { withTenant } from "@/server/db";
-import { PAPEL_ROTULO } from "@/server/domain/papeis";
+import { rotuloPapel } from "@/server/domain/papeis";
 import { Shell } from "./Shell";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <Shell
       escritorio={s.escritorio.name}
-      utilizador={{ nome: s.utilizador.name, papel: PAPEL_ROTULO[s.utilizador.role] }}
+      utilizador={{ nome: s.utilizador.name, papel: rotuloPapel(s.utilizador.role, s.utilizador.forma_tratamento) }}
       porTriar={n}
     >
       {children}

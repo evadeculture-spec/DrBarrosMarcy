@@ -97,6 +97,8 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       insert into users (organization_id, email, name, role, password_hash)
       values (${orgId}, 'carolina@demo.example.pt', 'Carolina Folgado', 'solicitador', ${hash}) returning id`;
     const U: Record<string, string> = { joao: adminId, marcia: marcia.id, carolina: carolina.id };
+    await tx`update users set forma_tratamento = 'masculino' where id = ${adminId}`;
+    await tx`update users set forma_tratamento = 'feminino' where id in (${marcia.id}, ${carolina.id})`;
     const c = { orgId, userId: adminId };
 
     const tipos = Object.fromEntries(

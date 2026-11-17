@@ -1,7 +1,7 @@
 "use server";
 
 import { executar } from "@/server/acao";
-import type { Papel } from "@/server/domain/papeis";
+import type { FormaTratamento, Papel } from "@/server/domain/papeis";
 import {
   adicionarRequisito,
   adicionarTipo,
@@ -9,6 +9,7 @@ import {
   alternarObrigatorio,
   criarUtilizador,
   definirAtivo,
+  definirFormaTratamento,
   guardarModelo,
   mudarPalavraPasse,
   removerRequisito,
@@ -49,4 +50,7 @@ export async function mudarPalavraPasseAcao(atual: string, nova: string) {
 }
 export async function simularFalhasAcao(n: number) {
   return executar((ctx) => simularFalhasEnvio(ctx, n));
+}
+export async function formaTratamentoAcao(id: string, forma: FormaTratamento | null) {
+  return executar((ctx) => definirFormaTratamento(ctx, id, forma));
 }

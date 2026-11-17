@@ -4,7 +4,7 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { withTenant } from "../db";
-import { PAPEIS, type Papel } from "../domain/papeis";
+import { PAPEIS, type FormaTratamento, type Papel } from "../domain/papeis";
 import { hashPalavraPasse, MIN_PALAVRA_PASSE } from "./auth";
 import { ErroNegocio, exigir, exigirUuid, registarEvento, type Ctx } from "./comum";
 
@@ -249,5 +249,17 @@ export async function dadosEscritorio(ctx: Ctx) {
       select name, slug, coalesce((settings->>'falhasEnvioSimuladas')::int, 0) as falhas
       from organizations where id = ${ctx.orgId}`;
     return o;
+  });
+}
+
+export async function definirFormaTratamento(ctx: Ctx, userId: string, forma: FormaTratamento | null) {
+  exigir(ctx, "gerir_escritorio");
+  exigirUuid(userId, "Utilizador");
+  if (forma !== null && forma !== "masculino" && forma !== "feminino") {
+    throw new ErroNegocio("Forma de tratamento desconhecida.");
+  }
+  await withTenant(ctx, async (tx) => {
+    const r = await tx`update users set forma_tratamento = ${forma} where id = ${userId} returning id`;
+    if (r.length === 0) throw new ErroNegocio("Utilizador não encontrado.", "nao_encontrado");
   });
 }
