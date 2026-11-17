@@ -116,6 +116,18 @@ e servidos com `Content-Disposition: attachment` e `nosniff`.
 
 ## Deploy
 
+### Netlify (demonstração publicada)
+
+https://solicitaflow-demo.netlify.app — usa o Netlify Database (Postgres). A
+ligação do Netlify é a do dono da BD; com `DATABASE_SET_ROLE` cada transação
+assume um papel restrito, sujeito a RLS. Variáveis do projeto: `AUTO_MIGRAR=1`
+(aplica migrações no primeiro acesso), `DATABASE_SET_ROLE=sf_app`,
+`DEFAULT_ORG_SLUG=demo`, `DEMO_SEED=1` + `SEED_DEMO_PASSWORD` (cria a
+demonstração se a BD estiver vazia), `DEMO_MOSTRAR_CONTAS=1`.
+O adaptador `@netlify/plugin-nextjs` está declarado em `netlify.toml`.
+
+### Outros alojamentos
+
 Funciona em qualquer alojamento Node (Vercel incluída) com um PostgreSQL
 acessível. Variáveis: ver `.env.example`. Para subdomínios por escritório,
 defina `APP_BASE_DOMAIN` (ex.: `solicitaflow.pt`) e um domínio curinga

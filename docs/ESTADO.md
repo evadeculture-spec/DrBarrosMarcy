@@ -62,6 +62,18 @@ escritório por ficheiro de configuração (`npm run escritorio:ativar`).
 Exportar o escritório; exportar, apagar (com «Anular» que restaura) e
 restaurar um processo com verificação SHA-256.
 
+## Publicação
+
+Demonstração em **https://solicitaflow-demo.netlify.app** (projeto Netlify
+`solicitaflow-demo`, Netlify Database). Verificado a 17/11/2026: entrada,
+Hoje, ficha, triagem, processos, modelos e configurações respondem, sem erros
+na consola. Limites específicos do Netlify:
+- os pedidos às funções aceitam no máximo ~6 MB, por isso anexos maiores
+  falham no carregamento, apesar do limite de 15 MB da aplicação;
+- os dados de demonstração foram criados no primeiro acesso (17/11/2026) e as
+  datas não se renovam sozinhas;
+- `.env*.local` nunca foram enviados (o deploy é feito a partir do commit).
+
 ## O que é fictício ou simulado
 
 - **Envio de email: simulado.** O modo «registo» guarda a mensagem como
