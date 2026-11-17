@@ -21,6 +21,8 @@ import {
   processoDeEmailAcao,
 } from "./acoes";
 
+const ORIGEM: Record<string, string> = { email: "Email", entregue_em_mao: "Entregue em mão", correio: "Correio", outro: "Outro" };
+
 export interface ProcessoAlvo {
   id: string;
   reference: string;
@@ -48,9 +50,9 @@ export function Triagem({
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Triagem</h1>
+          <h2 className="text-lg font-semibold text-ink">Receção de documentos</h2>
           <p className="mt-1 text-sm text-muted">
-            Carregue aqui os emails e anexos recebidos e associe cada anexo ao processo certo.
+            Registe o que chegou (email, entregue em mão, correio) e confirme, anexo a anexo, o processo e o documento certos.
           </p>
         </div>
         {!arquivados && (
@@ -63,10 +65,10 @@ export function Triagem({
       {formAberto && !arquivados && <FormEmail utilizadorAtual={utilizadorAtual} fechar={() => setFormAberto(false)} />}
 
       <nav aria-label="Caixas" className="flex gap-1 text-sm">
-        <Link href="/triagem" aria-current={!arquivados ? "page" : undefined} className={cn("rounded-lg px-3 py-1.5 focus-ring", !arquivados ? "bg-bordeaux text-white" : "text-ink hover:bg-surface")}>
+        <Link href="/documentos?separador=rececao" aria-current={!arquivados ? "page" : undefined} className={cn("rounded-lg px-3 py-1.5 focus-ring", !arquivados ? "bg-bordeaux text-white" : "text-ink hover:bg-surface")}>
           Por triar
         </Link>
-        <Link href="/triagem?arquivados=1" aria-current={arquivados ? "page" : undefined} className={cn("rounded-lg px-3 py-1.5 focus-ring", arquivados ? "bg-bordeaux text-white" : "text-ink hover:bg-surface")}>
+        <Link href="/documentos?separador=rececao&arquivados=1" aria-current={arquivados ? "page" : undefined} className={cn("rounded-lg px-3 py-1.5 focus-ring", arquivados ? "bg-bordeaux text-white" : "text-ink hover:bg-surface")}>
           Arquivados
         </Link>
       </nav>
@@ -97,6 +99,7 @@ function FormEmail({ utilizadorAtual, fechar }: { utilizadorAtual: string; fecha
     assunto: "",
     corpo: "",
     recebidoEm: "",
+    origem: "email",
   });
   const set = (k: keyof typeof valor) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setValor({ ...valor, [k]: e.target.value });
@@ -133,6 +136,20 @@ function FormEmail({ utilizadorAtual, fechar }: { utilizadorAtual: string; fecha
         <div>
           <Label htmlFor="em-assunto">Assunto</Label>
           <Input id="em-assunto" value={valor.assunto} onChange={set("assunto")} />
+        </div>
+        <div>
+          <Label htmlFor="em-origem">Origem</Label>
+          <select
+            id="em-origem"
+            value={valor.origem}
+            onChange={(e) => setValor({ ...valor, origem: e.target.value })}
+            className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus-ring"
+          >
+            <option value="email">Email</option>
+            <option value="entregue_em_mao">Entregue em mão</option>
+            <option value="correio">Correio</option>
+            <option value="outro">Outro</option>
+          </select>
         </div>
         <div>
           <Label htmlFor="em-data">Recebido em (opcional)</Label>
@@ -188,7 +205,7 @@ function CartaoEmail({
             {remetente}
             {email.from_name && email.from_email && <span className="ml-1 font-normal text-muted">&lt;{email.from_email}&gt;</span>}
           </h2>
-          <p className="text-xs text-muted">{formatarDataHora(email.received_at)}</p>
+          <p className="text-xs text-muted">{ORIGEM[email.origem] ?? "Email"} · {formatarDataHora(email.received_at)}</p>
         </div>
         <p className="mt-1 text-sm text-ink">{email.subject || "(sem assunto)"}</p>
         {email.body && (
@@ -257,8 +274,11 @@ function CartaoEmail({
 
 function LinhaAnexoTriagem({ anexo, processos, sugestoes }: { anexo: AnexoCaixa; processos: ProcessoAlvo[]; sugestoes: string[] }) {
   const { pendente, correr } = useAcao();
-  const [processo, setProcesso] = useState(sugestoes.length === 1 ? sugestoes[0] : "");
-  const [item, setItem] = useState("");
+  const sug = anexo.sugestao;
+  const [processo, setProcesso] = useState(sug?.matterId ?? "");
+  const [item, setItem] = useState(sug?.itemId ?? "");
+  if (sug && !sugestoes.includes(sug.matterId)) sugestoes = [sug.matterId, ...sugestoes];
+  const segueSugestao = sug && processo === sug.matterId;
   const p = processos.find((x) => x.id === processo);
   const ordenados = [...processos].sort((a, b) => Number(sugestoes.includes(b.id)) - Number(sugestoes.includes(a.id)));
 
@@ -266,11 +286,18 @@ function LinhaAnexoTriagem({ anexo, processos, sugestoes }: { anexo: AnexoCaixa;
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <FileText aria-hidden className="h-4 w-4 shrink-0 text-muted" />
-        <a href={`/api/anexos/${anexo.id}`} className="min-w-0 flex-1 truncate text-ink hover:text-bordeaux hover:underline focus-ring rounded">
-          {anexo.filename}
-        </a>
+        <span className="min-w-0 flex-1 truncate text-ink">{anexo.filename}</span>
         <span className="text-xs text-muted">{tamanho(anexo.size_bytes)}</span>
+        <a href={`/api/anexos/${anexo.id}?ver=1`} target="_blank" rel="noopener" className="inline-flex min-h-[44px] items-center rounded-lg px-2 text-sm font-medium text-bordeaux hover:underline focus-ring">
+          Pré-visualizar<span className="sr-only"> {anexo.filename}</span>
+        </a>
       </div>
+      {!anexo.matter_id && sug && (
+        <p className={cn("mt-1 text-xs", segueSugestao ? "text-ink/80" : "text-muted")}>
+          <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-900">Sugestão</span>{" "}
+          {sug.reference} · {sug.cliente}{sug.itemLabel ? ` · ${sug.itemLabel}` : ""} — confirme antes de associar.
+        </p>
+      )}
       {anexo.matter_id ? (
         <p className="mt-1 flex items-center gap-1.5 text-sm text-emerald-900">
           <CheckCircle2 aria-hidden className="h-4 w-4" />

@@ -35,7 +35,7 @@ export async function entrarAcao(_: EstadoEntrar, form: FormData): Promise<Estad
   }
   tentativas.delete(chave);
   guardarSessao(token);
-  redirect("/hoje");
+  redirect("/dashboard");
 }
 
 function guardarSessao(token: string) {
@@ -59,7 +59,7 @@ export async function entrarDemoAcao(email: string): Promise<EstadoEntrar> {
   const token = await entrarDemonstracao(escritorio.id, email);
   if (!token) return { erro: "Esta conta de demonstração não está disponível." };
   guardarSessao(token);
-  redirect("/hoje");
+  redirect("/dashboard");
 }
 
 export async function sairAcao() {

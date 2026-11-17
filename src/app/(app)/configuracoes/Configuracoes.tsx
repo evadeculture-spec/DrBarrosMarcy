@@ -63,7 +63,6 @@ export function Configuracoes({
         <h1 className="text-2xl font-semibold text-ink">Configurações</h1>
         <p className="mt-1 text-sm text-muted">{escritorio.name} · endereço «{escritorio.slug}»</p>
       </header>
-      <ListasDocumentais listas={listas} admin={admin} />
       {admin && <Utilizadores utilizadores={utilizadores} eu={eu} />}
       {admin && <Envio falhas={escritorio.falhas} modo={envioModo} />}
       {admin && <ExportarRestaurar />}
@@ -72,7 +71,7 @@ export function Configuracoes({
   );
 }
 
-function ListasDocumentais({ listas, admin }: { listas: TipoConfig[]; admin: boolean }) {
+export function ListasDocumentais({ listas, admin }: { listas: TipoConfig[]; admin: boolean }) {
   const { pendente, correr } = useAcao();
   const [novoTipo, setNovoTipo] = useState("");
   return (

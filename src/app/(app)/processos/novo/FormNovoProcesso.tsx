@@ -13,16 +13,19 @@ export function FormNovoProcesso({
   tipos,
   utilizadores,
   utilizadorAtual,
+  clienteInicial,
 }: {
   clientes: ClienteResumo[];
   tipos: TipoResumo[];
   utilizadores: UtilizadorResumo[];
   utilizadorAtual: string;
+  clienteInicial: string | null;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
-  const { valor: f, setValor, recuperado, limpar } = useRascunhoLocal(`sf:novo-processo:${utilizadorAtual}`, {
+  const [filtro, setFiltro] = useState("");
+  const { valor: rascunho, setValor, recuperado, limpar } = useRascunhoLocal(`sf:novo-processo:${utilizadorAtual}`, {
     modoCliente: clientes.length ? "existente" : "novo",
     clienteId: "",
     nome: "",
@@ -32,7 +35,14 @@ export function FormNovoProcesso({
     titulo: "",
     responsavelId: utilizadorAtual,
     seguimento: "",
+    estadoInicial: "em_conferencia",
   });
+  // Vindo da ficha de um cliente, esse cliente prevalece sobre o rascunho.
+  const f = clienteInicial ? { ...rascunho, modoCliente: "existente", clienteId: rascunho.clienteId || clienteInicial } : rascunho;
+  const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const visiveis = clientes
+    .filter((c) => !filtro || norm(`${c.name} ${c.reference} ${c.city ?? ""} ${c.email ?? ""}`).includes(norm(filtro)) || c.id === f.clienteId)
+    .slice(0, 60);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setValor({ ...f, [k]: e.target.value });
 
@@ -47,6 +57,7 @@ export function FormNovoProcesso({
         titulo: f.titulo,
         responsavelId: f.responsavelId,
         seguimento: f.seguimento || null,
+        estadoInicial: f.estadoInicial === "por_triar" ? "por_triar" : "em_conferencia",
       });
       if (!r.ok) {
         setErro(r.erro);
@@ -81,16 +92,22 @@ export function FormNovoProcesso({
           </label>
         </div>
         {f.modoCliente === "existente" ? (
-          <div>
-            <Label htmlFor="np-cliente">Cliente</Label>
-            <Select id="np-cliente" value={f.clienteId} onChange={set("clienteId")} required>
-              <option value="">Escolha…</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}{c.email ? ` — ${c.email}` : ""}
-                </option>
-              ))}
-            </Select>
+          <div className="grid gap-2">
+            <div>
+              <Label htmlFor="np-filtro">Procurar cliente</Label>
+              <Input id="np-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Nome, referência ou localidade" autoComplete="off" />
+            </div>
+            <div>
+              <Label htmlFor="np-cliente">Cliente</Label>
+              <Select id="np-cliente" value={f.clienteId} onChange={set("clienteId")} required>
+                <option value="">Escolha… ({visiveis.length}{visiveis.length === 60 ? "+" : ""} visíveis)</option>
+                {visiveis.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} — {c.reference}{c.city ? ` · ${c.city}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -125,6 +142,13 @@ export function FormNovoProcesso({
             {utilizadores.map((u) => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="np-estado">Estado inicial</Label>
+          <Select id="np-estado" value={f.estadoInicial} onChange={set("estadoInicial")}>
+            <option value="em_conferencia">Em conferência</option>
+            <option value="por_triar">Por triar</option>
           </Select>
         </div>
         <div className="sm:col-span-2">

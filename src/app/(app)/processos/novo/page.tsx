@@ -4,7 +4,7 @@ import { FormNovoProcesso } from "./FormNovoProcesso";
 
 export const metadata = { title: "Novo processo" };
 
-export default async function NovoProcessoPage() {
+export default async function NovoProcessoPage({ searchParams }: { searchParams: { cliente?: string } }) {
   const s = await exigirSessao();
   const [clientes, tipos, utilizadores] = await Promise.all([
     listarClientes(s.ctx),
@@ -15,13 +15,14 @@ export default async function NovoProcessoPage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-semibold text-ink">Novo processo</h1>
       <p className="mt-1 text-sm text-muted">
-        A lista documental é criada a partir do tipo de processo (configurável em Configurações).
+        A referência é atribuída automaticamente e a lista documental é copiada do modelo do tipo de processo (editável em Templates).
       </p>
       <FormNovoProcesso
         clientes={clientes}
         tipos={tipos}
         utilizadores={utilizadores.filter((u) => u.active)}
         utilizadorAtual={s.utilizador.id}
+        clienteInicial={clientes.find((c) => c.id === searchParams.cliente)?.id ?? null}
       />
     </div>
   );

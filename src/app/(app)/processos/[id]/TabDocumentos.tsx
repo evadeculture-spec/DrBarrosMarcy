@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { ArrowRightLeft, FileText, Upload } from "lucide-react";
 import { useAcao } from "@/components/useAcao";
@@ -13,13 +14,14 @@ import {
   anularAcao,
   carregarNoProcessoAcao,
   moverAnexoAcao,
+  simularRececaoAcao,
 } from "../acoes";
 import type { DestinoMover } from "./Ficha";
 
 const ESTADOS_ITEM = [
   { v: "em_falta", r: "Em falta" },
-  { v: "recebido", r: "Recebido (por conferir)" },
-  { v: "conferido", r: "Conferido" },
+  { v: "recebido", r: "Recebido para revisão" },
+  { v: "conferido", r: "Validado" },
   { v: "rejeitado", r: "Rejeitado" },
 ] as const;
 
@@ -36,11 +38,35 @@ export function tamanho(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function TabDocumentos({ ficha, destinos }: { ficha: Ficha; destinos: DestinoMover[] }) {
+export function TabDocumentos({ ficha, destinos, demo }: { ficha: Ficha; destinos: DestinoMover[]; demo: boolean }) {
   const concluido = ficha.matter.state === "concluido";
   const soltos = ficha.anexos.filter((a) => !a.item_id);
+  const router = useRouter();
+  const { pendente, correr } = useAcao();
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface p-4">
+        <p className="min-w-0 flex-1 text-sm text-muted">
+          Documentos recebidos por email, correio ou em mão registam-se em{" "}
+          <a href="/documentos?separador=rececao" className="font-medium text-bordeaux underline-offset-2 hover:underline focus-ring rounded">Documentos em falta → Receção</a>
+          , onde se confirma o processo certo para cada anexo. Também pode carregar um ficheiro diretamente num documento abaixo.
+        </p>
+        {demo && !concluido && (
+          <Button
+            variant="outline"
+            className="h-11"
+            disabled={pendente}
+            onClick={() =>
+              correr(() => simularRececaoAcao(ficha.matter.id), {
+                sucesso: (d) => `Resposta simulada com ${d.anexos} anexos. Associe-os em Receção.`,
+                depois: () => router.push("/documentos?separador=rececao"),
+              })
+            }
+          >
+            Simular resposta do cliente (3 anexos)
+          </Button>
+        )}
+      </div>
       {concluido && (
         <p className="rounded-lg bg-background px-3 py-2 text-sm text-muted">
           Processo concluído: reabra-o para alterar a lista documental.

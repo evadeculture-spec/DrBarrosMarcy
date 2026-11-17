@@ -13,8 +13,10 @@ import {
   devolverPedidoAcao,
   guardarRascunhoAcao,
   prepararPedidoAcao,
+  registarEnvioExternoAcao,
   submeterPedidoAcao,
 } from "../acoes";
+import { useAvisos } from "@/components/avisos";
 import type { Permissoes } from "./Ficha";
 
 const ROTULO: Record<string, string> = {
@@ -162,6 +164,8 @@ function PedidoAberto({ pedido, permissoes }: { pedido: PedidoFicha; permissoes:
         </div>
       </div>
 
+      <CopiarERegistar pedido={pedido} campos={campos} permissoes={permissoes} aGuardar={guardado.estado === "a_guardar"} />
+
       <div className="flex flex-wrap gap-2">
         {pedido.status === "rascunho" && (
           <>
@@ -217,5 +221,70 @@ function PedidoAberto({ pedido, permissoes }: { pedido: PedidoFicha; permissoes:
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * Modo sem envio automático: copiar o texto para o email do escritório e,
+ * depois de o enviar lá, registar aqui o envio. Copiar não muda o estado.
+ */
+function CopiarERegistar({
+  pedido,
+  campos,
+  permissoes,
+  aGuardar,
+}: {
+  pedido: PedidoFicha;
+  campos: { para: string; assunto: string; corpo: string };
+  permissoes: Permissoes;
+  aGuardar: boolean;
+}) {
+  const { pendente, correr } = useAcao();
+  const { avisar } = useAvisos();
+  const [nota, setNota] = useState("");
+  const [registar, setRegistar] = useState(false);
+  const copiar = async () => {
+    const texto = `Para: ${campos.para}\nAssunto: ${campos.assunto}\n\n${campos.corpo}`;
+    try {
+      await navigator.clipboard.writeText(texto);
+      avisar({ tipo: "sucesso", texto: "Texto copiado. O pedido continua por enviar até registar o envio." });
+    } catch {
+      avisar({ tipo: "erro", texto: "Não foi possível copiar automaticamente. Selecione o texto e copie à mão." });
+    }
+  };
+  return (
+    <div className="rounded-xl border border-border bg-background p-3">
+      <p className="text-sm text-ink">
+        Enviar a partir do email do escritório? Copie o texto, envie-o e depois registe o envio aqui.
+        <span className="block text-xs text-muted">Criar ou copiar o rascunho não o marca como enviado.</span>
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button type="button" variant="outline" className="h-11" onClick={copiar}>
+          Copiar texto
+        </Button>
+        {permissoes.aprovar && (
+          <Button type="button" variant="ghost" className="h-11" aria-expanded={registar} onClick={() => setRegistar((v) => !v)}>
+            Registar envio externo
+          </Button>
+        )}
+      </div>
+      {registar && (
+        <form
+          className="mt-2 flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            correr(() => registarEnvioExternoAcao(pedido.id, nota), {
+              sucesso: "Envio externo registado. A bola passa ao cliente.",
+            });
+          }}
+        >
+          <div className="min-w-[14rem] flex-1">
+            <Label htmlFor="ee-nota">Nota (opcional)</Label>
+            <Input id="ee-nota" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ex.: enviado do email geral às 10h" />
+          </div>
+          <Button type="submit" className="h-10" disabled={pendente || aGuardar}>Confirmar que foi enviado</Button>
+        </form>
+      )}
+    </div>
   );
 }

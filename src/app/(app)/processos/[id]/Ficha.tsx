@@ -24,6 +24,9 @@ import {
 import { TabDocumentos } from "./TabDocumentos";
 import { TabPedido } from "./TabPedido";
 import { TabPrazos } from "./TabPrazos";
+import { PainelProximaAcao } from "./PainelProximaAcao";
+import { TabPagamento } from "./TabPagamento";
+import { ListaTarefas } from "../../tarefas/ListaTarefas";
 
 export interface DestinoMover {
   id: string;
@@ -33,6 +36,7 @@ export interface DestinoMover {
 }
 
 export interface Permissoes {
+  eu: string;
   aprovar: boolean;
   confirmarPrazo: boolean;
   administrar: boolean;
@@ -40,8 +44,10 @@ export interface Permissoes {
 
 const SEPARADORES = [
   { id: "documentos", rotulo: "Documentos" },
+  { id: "tarefas", rotulo: "Tarefas" },
+  { id: "prazos", rotulo: "Prazos" },
   { id: "pedido", rotulo: "Pedido ao cliente" },
-  { id: "prazos", rotulo: "Prazos e seguimento" },
+  { id: "pagamento", rotulo: "Pagamento" },
   { id: "historico", rotulo: "Histórico" },
 ] as const;
 
@@ -51,14 +57,19 @@ export function Ficha({
   destinos,
   separadorInicial,
   permissoes,
+  hoje,
+  demo,
 }: {
   ficha: DadosFicha;
   utilizadores: UtilizadorResumo[];
   destinos: DestinoMover[];
   separadorInicial: string;
   permissoes: Permissoes;
+  hoje: string;
+  demo: boolean;
 }) {
   const { matter: m, faixa } = ficha;
+  const eu = permissoes.eu;
   const [separador, setSeparador] = useState(separadorInicial);
   const { pendente, correr } = useAcao();
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -177,6 +188,8 @@ export function Ficha({
           )}
       </div>
 
+      <PainelProximaAcao ficha={ficha} hoje={hoje} />
+
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <CampoResponsavel matterId={m.id} atual={m.responsible_id} utilizadores={utilizadores} />
         <CampoSeguimento matterId={m.id} atual={m.follow_up_on} />
@@ -199,12 +212,17 @@ export function Ficha({
               onClick={() => mudarSeparador(t.id)}
               onKeyDown={(e) => teclaSeparador(e, i)}
               className={cn(
-                "relative whitespace-nowrap px-3.5 py-2.5 text-sm font-medium transition-colors focus-ring rounded-t-lg",
+                "relative min-h-[44px] whitespace-nowrap px-3.5 py-2.5 text-sm font-medium transition-colors focus-ring rounded-t-lg",
                 ativo ? "text-bordeaux" : "text-muted hover:text-ink",
               )}
             >
               {t.rotulo}
-              {t.id === "pedido" && pedidoAberto && <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-bordeaux" aria-label="(em curso)" />}
+              {t.id === "pedido" && pedidoAberto && (
+                <>
+                  <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-bordeaux" aria-hidden />
+                  <span className="sr-only"> (em curso)</span>
+                </>
+              )}
               {ativo && <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-bordeaux" />}
             </button>
           );
@@ -212,7 +230,18 @@ export function Ficha({
       </div>
 
       <div role="tabpanel" id={`painel-${separador}`} aria-labelledby={`sep-${separador}`} className="pt-5" tabIndex={0}>
-        {separador === "documentos" && <TabDocumentos ficha={ficha} destinos={destinos} />}
+        {separador === "documentos" && <TabDocumentos ficha={ficha} destinos={destinos} demo={demo} />}
+        {separador === "tarefas" && (
+          <ListaTarefas
+            tarefas={ficha.tarefas}
+            utilizadores={utilizadores.filter((u) => u.active).map(({ id, name }) => ({ id, name }))}
+            eu={eu}
+            hoje={hoje}
+            matterId={m.id}
+            mostrarProcesso={false}
+          />
+        )}
+        {separador === "pagamento" && <TabPagamento ficha={ficha} />}
         {separador === "pedido" && <TabPedido ficha={ficha} permissoes={permissoes} />}
         {separador === "prazos" && <TabPrazos ficha={ficha} permissoes={permissoes} />}
         {separador === "historico" && <TabHistorico ficha={ficha} permissoes={permissoes} />}

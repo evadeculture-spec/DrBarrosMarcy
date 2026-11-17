@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Entrar" };
 
 export default async function EntrarPage() {
-  if (await sessaoAtual()) redirect("/hoje");
+  if (await sessaoAtual()) redirect("/dashboard");
   const escritorio = await escritorioAtual();
   const demo = entradaRapidaAtiva(escritorio?.slug);
 

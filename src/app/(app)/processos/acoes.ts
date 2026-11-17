@@ -6,7 +6,10 @@ import {
   alterarItem,
   atribuirResponsavel,
   criarProcesso,
+  definirBloqueio,
+  definirProximaAcao,
   definirSeguimento,
+  definirValores,
   guardarPosicao,
   transicionar,
   type NovoProcesso,
@@ -18,10 +21,12 @@ import {
   devolverPedido,
   guardarRascunho,
   prepararPedido,
+  registarEnvioExterno,
   submeterPedido,
   type AlteracoesRascunho,
 } from "@/server/services/pedidos";
-import { anularOperacao, carregarNoProcesso, moverAnexo } from "@/server/services/triagem";
+import { anularOperacao, carregarNoProcesso, moverAnexo, simularRececao } from "@/server/services/triagem";
+import { withTenant } from "@/server/db";
 import { sessaoAtual } from "@/server/sessao";
 import { ErroNegocio } from "@/server/services/comum";
 import { apagarProcesso, exportarProcesso, restaurarProcesso } from "@/server/services/exportacao";
@@ -123,5 +128,29 @@ export async function restaurarProcessoAcao(form: FormData) {
       throw new ErroNegocio("O ficheiro não é JSON válido.");
     }
     return restaurarProcesso(ctx, dados);
+  });
+}
+
+export async function proximaAcaoAcao(matterId: string, texto: string | null) {
+  return executar((ctx) => definirProximaAcao(ctx, matterId, texto));
+}
+export async function bloqueioAcao(matterId: string, b: { motivo: string; nota?: string | null; revisao: string } | null) {
+  return executar((ctx) => definirBloqueio(ctx, matterId, b));
+}
+export async function valoresAcao(matterId: string, previsto: number | null, pago: number) {
+  return executar((ctx) => definirValores(ctx, matterId, previsto, pago));
+}
+export async function registarEnvioExternoAcao(pedidoId: string, nota: string) {
+  return executar((ctx) => registarEnvioExterno(ctx, pedidoId, nota));
+}
+/** Só em escritórios de demonstração (verificado no servidor). */
+export async function simularRececaoAcao(matterId: string) {
+  return executar(async (ctx) => {
+    const [org] = await withTenant(ctx, (tx) => tx<{ demo: boolean }[]>`
+      select coalesce((settings->>'demo')::boolean, false) as demo from organizations where id = ${ctx.orgId}`);
+    if (!org?.demo) throw new ErroNegocio("A simulação só existe no escritório de demonstração.");
+    const { pdfMinimo } = await import("@/server/demo");
+    const r = await simularRececao(ctx, matterId, pdfMinimo);
+    return { anexos: r.anexos.length };
   });
 }
