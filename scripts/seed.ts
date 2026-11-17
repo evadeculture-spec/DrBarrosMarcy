@@ -30,7 +30,7 @@ async function main() {
   await migrate(sql, papel);
   await criarDadosDemo(sql, palavraPasse);
   console.log("Dados de demonstração criados (escritórios «demo» e «norte»).");
-  console.log("Entrar: http://demo.localhost:3000 — ines@ / marcia@ / tiago@demo.example.pt");
+  console.log("Entrar: http://demo.localhost:3000 — marcia@ / joao@ / carolina@demo.example.pt");
 }
 
 if (process.argv[1]?.endsWith("seed.ts")) {

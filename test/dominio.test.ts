@@ -46,7 +46,7 @@ describe("máquina de estados", () => {
 describe("faixa da ficha", () => {
   const base = {
     desde: "2026-11-12T10:00:00Z",
-    responsavel: "Márcia Tavares",
+    responsavel: "Márcia Raposo",
     cliente: "Rui Fonseca",
     itens: [
       { required: true, status: "conferido" as const },
@@ -60,7 +60,7 @@ describe("faixa da ficha", () => {
     const f = calcularFaixa({ ...base, estado: "em_conferencia" });
     expect(f.falta).toBe(2);
     expect(f.texto).toBe(
-      "Falta: 2 documentos · Aguarda: Márcia Tavares desde 12/11/2026 · Responsável: Márcia Tavares",
+      "Falta: 2 documentos · Aguarda: Márcia Raposo desde 12/11/2026 · Responsável: Márcia Raposo",
     );
   });
 
@@ -74,7 +74,7 @@ describe("faixa da ficha", () => {
     expect(calcularFaixa({ ...base, estado: "completo", itens: [{ required: true, status: "em_falta" }] }).texto)
       .toMatch(/^Falta: 1 documento ·/);
     expect(calcularFaixa({ ...base, estado: "concluido", itens: [] }).texto)
-      .toBe("Falta: nada · Aguarda: ninguém · Responsável: Márcia Tavares");
+      .toBe("Falta: nada · Aguarda: ninguém · Responsável: Márcia Raposo");
   });
 });
 
@@ -82,7 +82,7 @@ describe("vista Hoje (regras puras)", () => {
   const hoje = "2026-11-16";
   const p = (o: Partial<ProcessoHoje>): ProcessoHoje => ({
     id: "1", reference: "2026/041", estado: "resposta_por_conferir", stateSince: "2026-11-15T09:00:00Z",
-    followUpOn: "2026-11-23", responsavelId: "u", responsavelNome: "Márcia Tavares",
+    followUpOn: "2026-11-23", responsavelId: "u", responsavelNome: "Márcia Raposo",
     clienteNome: "Rui Fonseca", falta: 1, totalObrigatorios: 3, ...o,
   });
 

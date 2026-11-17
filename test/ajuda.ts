@@ -24,7 +24,7 @@ export async function novoEscritorio(prefixo = "t"): Promise<Escritorio> {
   const { orgId, adminId } = await ativarEscritorio(adminDb(), {
     slug,
     nome: `Escritório ${slug}`,
-    administrador: { nome: "Alda Admin", email: `admin@${slug}.example.pt` },
+    administrador: { nome: "Márcia Raposo", email: `admin@${slug}.example.pt` },
   }, PALAVRA_PASSE);
   hash ??= hashPalavraPasse(PALAVRA_PASSE);
   const h = await hash;
@@ -35,8 +35,8 @@ export async function novoEscritorio(prefixo = "t"): Promise<Escritorio> {
         values (${orgId}, ${`${papel}@${slug}.example.pt`}, ${nome}, ${papel}, ${h}) returning id`;
       return u.id;
     }, adminDb());
-  const solicitadorId = await criar("Márcia Solicitadora", "solicitador");
-  const triagemId = await criar("Tiago Triagem", "triagem");
+  const solicitadorId = await criar("João Barros", "solicitador");
+  const triagemId = await criar("Carolina Folgado", "triagem");
   const tipos = await withTenant({ orgId }, async (tx) =>
     Object.fromEntries((await tx<{ id: string; key: string }[]>`select id, key from matter_types`).map((t) => [t.key, t.id])),
     adminDb(),
@@ -48,7 +48,7 @@ export async function novoEscritorio(prefixo = "t"): Promise<Escritorio> {
     solicitador: { orgId, userId: solicitadorId, papel: "solicitador" },
     triagem: { orgId, userId: triagemId, papel: "triagem" },
     tipos,
-    nomes: { [adminId]: "Alda Admin", [solicitadorId]: "Márcia Solicitadora", [triagemId]: "Tiago Triagem" },
+    nomes: { [adminId]: "Márcia Raposo", [solicitadorId]: "João Barros", [triagemId]: "Carolina Folgado" },
   };
 }
 

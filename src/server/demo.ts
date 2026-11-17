@@ -85,18 +85,18 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
   const { orgId, adminId } = await ativarEscritorio(sql, {
     slug: "demo",
     nome: "Solicitadoria Exemplo (demonstração)",
-    administrador: { nome: "Inês Moura", email: "ines@demo.example.pt" },
+    administrador: { nome: "Márcia Raposo", email: "marcia@demo.example.pt" },
   }, palavraPasse);
 
   await withTenant({ orgId }, async (tx) => {
     const hash = await hashPalavraPasse(palavraPasse);
-    const [marcia] = await tx<{ id: string }[]>`
+    const [joao] = await tx<{ id: string }[]>`
       insert into users (organization_id, email, name, role, password_hash)
-      values (${orgId}, 'marcia@demo.example.pt', 'Márcia Tavares', 'solicitador', ${hash}) returning id`;
-    const [tiago] = await tx<{ id: string }[]>`
+      values (${orgId}, 'joao@demo.example.pt', 'João Barros', 'solicitador', ${hash}) returning id`;
+    const [carolina] = await tx<{ id: string }[]>`
       insert into users (organization_id, email, name, role, password_hash)
-      values (${orgId}, 'tiago@demo.example.pt', 'Tiago Correia', 'triagem', ${hash}) returning id`;
-    const U: Record<string, string> = { marcia: marcia.id, tiago: tiago.id, ines: adminId };
+      values (${orgId}, 'carolina@demo.example.pt', 'Carolina Folgado', 'triagem', ${hash}) returning id`;
+    const U: Record<string, string> = { marcia: adminId, joao: joao.id, carolina: carolina.id };
     const c = { orgId, userId: adminId };
 
     const tipos = Object.fromEntries(
@@ -110,10 +110,10 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
         tipo: "habilitacao_herdeiros", estado: "resposta_por_conferir", desde: ha(0, 3), criado: 16,
         responsavel: "marcia", seguimento: 7, itens: ["conferido", "recebido", "em_falta", "em_falta"],
         historico: [
-          [16, "tiago", "criado", "Processo criado (Habilitação de herdeiros)."],
+          [16, "carolina", "criado", "Processo criado (Habilitação de herdeiros)."],
           [15, "marcia", "item", "«Certidão de óbito»: Recebido → Conferido"],
           [6, "marcia", "pedido_enviado", "Pedido enviado para rui.fonseca@example.pt."],
-          [0, "tiago", "anexo_associado", "Anexo «Identificacao_herdeiros.pdf» associado a «Documentos de identificação dos herdeiros»."],
+          [0, "carolina", "anexo_associado", "Anexo «Identificacao_herdeiros.pdf» associado a «Documentos de identificação dos herdeiros»."],
         ],
         pedido: { status: "enviado", dias: 6 },
       },
@@ -122,8 +122,8 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
         tipo: "registo_predial", estado: "em_conferencia", desde: ha(2), criado: 4,
         responsavel: "marcia", seguimento: null, itens: ["recebido", "recebido", "conferido", "em_falta", "em_falta"],
         historico: [
-          [4, "tiago", "criado", "Processo criado (Registo predial)."],
-          [2, "tiago", "anexo_associado", "Documentos iniciais associados."],
+          [4, "carolina", "criado", "Processo criado (Registo predial)."],
+          [2, "carolina", "anexo_associado", "Documentos iniciais associados."],
         ],
         prazos: [{ label: "Entrega do pedido na conservatória", offset: 2, confirmado: true }],
         anexoErrado: { nome: "Caderneta_predial_Sara_Gomes.pdf", item: 1 },
@@ -133,7 +133,7 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
         tipo: "procuracao", estado: "a_aguardar_cliente", desde: ha(3), criado: 8,
         responsavel: "marcia", seguimento: 4, itens: ["em_falta", "recebido", "conferido"],
         historico: [
-          [8, "tiago", "criado", "Processo criado (Procuração)."],
+          [8, "carolina", "criado", "Processo criado (Procuração)."],
           [3, "marcia", "pedido_enviado", "Pedido enviado para joaquim.pires@example.pt."],
         ],
         pedido: { status: "enviado", dias: 3 },
@@ -141,10 +141,10 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       {
         numero: 33, cliente: { nome: "Beatriz Carvalho", email: "beatriz.carvalho@example.pt", telefone: "+351 900 000 104" },
         tipo: "arrendamento", estado: "a_aguardar_cliente", desde: ha(9), criado: 15,
-        responsavel: "ines", seguimento: -1, itens: ["conferido", "em_falta", "em_falta", "em_falta"],
+        responsavel: "joao", seguimento: -1, itens: ["conferido", "em_falta", "em_falta", "em_falta"],
         historico: [
-          [15, "tiago", "criado", "Processo criado (Contrato de arrendamento)."],
-          [9, "ines", "pedido_enviado", "Pedido enviado para beatriz.carvalho@example.pt."],
+          [15, "carolina", "criado", "Processo criado (Contrato de arrendamento)."],
+          [9, "joao", "pedido_enviado", "Pedido enviado para beatriz.carvalho@example.pt."],
         ],
         prazos: [{ label: "Data indicada pela cliente para assinatura", offset: 5, confirmado: false }],
         pedido: { status: "enviado", dias: 9 },
@@ -154,18 +154,18 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
         tipo: "habilitacao_herdeiros", estado: "a_aguardar_aprovacao", desde: ha(0, 2), criado: 3,
         responsavel: "marcia", seguimento: null, itens: ["conferido", "em_falta", "em_falta", "em_falta"],
         historico: [
-          [3, "tiago", "criado", "Processo criado (Habilitação de herdeiros)."],
-          [0, "tiago", "pedido_submetido", "Pedido ao cliente submetido para aprovação."],
+          [3, "carolina", "criado", "Processo criado (Habilitação de herdeiros)."],
+          [0, "carolina", "pedido_submetido", "Pedido ao cliente submetido para aprovação."],
         ],
         pedido: { status: "a_aguardar_aprovacao", dias: 0 },
       },
       {
         numero: 40, cliente: { nome: "Carla Nogueira", email: "carla.nogueira@example.pt", telefone: "+351 900 000 106" },
         tipo: "nif_nao_residente", estado: "envio_falhado", desde: ha(0, 1), criado: 2,
-        responsavel: "ines", seguimento: null, itens: ["recebido", "em_falta", "em_falta"],
+        responsavel: "joao", seguimento: null, itens: ["recebido", "em_falta", "em_falta"],
         historico: [
-          [2, "tiago", "criado", "Processo criado (NIF para não residente)."],
-          [0, "ines", "pedido_falhou", "O envio do pedido falhou: servidor de email indisponível."],
+          [2, "carolina", "criado", "Processo criado (NIF para não residente)."],
+          [0, "joao", "pedido_falhou", "O envio do pedido falhou: servidor de email indisponível."],
         ],
         pedido: { status: "falhado", dias: 0, tentativas: 1, erro: "Servidor de email indisponível (demonstração)." },
       },
@@ -174,7 +174,7 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
         tipo: "registo_predial", estado: "completo", desde: ha(1), criado: 12,
         responsavel: "marcia", seguimento: null, itens: ["conferido", "conferido", "conferido", "conferido", "em_falta"],
         historico: [
-          [12, "tiago", "criado", "Processo criado (Registo predial)."],
+          [12, "carolina", "criado", "Processo criado (Registo predial)."],
           [1, "marcia", "estado", "Estado: Em conferência → Completo"],
         ],
         prazos: [{ label: "Escritura agendada", offset: 10, confirmado: true }],
@@ -182,24 +182,24 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       {
         numero: 31, cliente: { nome: "Patrícia Rocha", email: "patricia.rocha@example.pt", telefone: "+351 900 000 108" },
         tipo: "procuracao", estado: "concluido", desde: ha(10), criado: 25,
-        responsavel: "ines", seguimento: null, itens: ["conferido", "conferido", "conferido"],
+        responsavel: "joao", seguimento: null, itens: ["conferido", "conferido", "conferido"],
         historico: [
-          [25, "tiago", "criado", "Processo criado (Procuração)."],
-          [10, "ines", "estado", "Estado: Completo → Concluído"],
+          [25, "carolina", "criado", "Processo criado (Procuração)."],
+          [10, "joao", "estado", "Estado: Completo → Concluído"],
         ],
       },
       {
         numero: 42, cliente: { nome: "Hortas do Zêzere, Lda.", email: "geral@hortas-zezere.example.pt", telefone: "+351 900 000 109" },
         tipo: "arrendamento", estado: "por_triar", desde: ha(0, 1), criado: 0,
         responsavel: "marcia", seguimento: null, itens: ["em_falta", "em_falta", "em_falta", "em_falta"],
-        historico: [[0, "tiago", "criado", "Processo criado (Contrato de arrendamento)."]],
+        historico: [[0, "carolina", "criado", "Processo criado (Contrato de arrendamento)."]],
       },
       {
         numero: 37, cliente: { nome: "Luís Matias", email: "luis.matias@example.pt", telefone: "+351 900 000 110" },
         tipo: "nif_nao_residente", estado: "a_aguardar_cliente", desde: ha(7), criado: 10,
         responsavel: "marcia", seguimento: 0, itens: ["conferido", "em_falta", "rejeitado"],
         historico: [
-          [10, "tiago", "criado", "Processo criado (NIF para não residente)."],
+          [10, "carolina", "criado", "Processo criado (NIF para não residente)."],
           [7, "marcia", "item", "«Procuração assinada»: Recebido → Rejeitado (assinatura em falta)"],
           [7, "marcia", "pedido_enviado", "Pedido enviado para luis.matias@example.pt."],
         ],
@@ -208,8 +208,8 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       {
         numero: 34, cliente: { nome: "Sara Gomes", email: "sara.gomes@example.pt", telefone: "+351 900 000 111" },
         tipo: "registo_predial", estado: "em_conferencia", desde: ha(5), criado: 6,
-        responsavel: "ines", seguimento: 1, itens: ["conferido", "em_falta", "recebido", "em_falta", "em_falta"],
-        historico: [[6, "tiago", "criado", "Processo criado (Registo predial)."]],
+        responsavel: "joao", seguimento: 1, itens: ["conferido", "em_falta", "recebido", "em_falta", "em_falta"],
+        historico: [[6, "carolina", "criado", "Processo criado (Registo predial)."]],
         prazos: [{ label: "Resposta à notificação (data dita por telefone)", offset: -2, confirmado: false }],
       },
     ];
@@ -240,12 +240,12 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
         itemIds.push(it.id);
         if (status === "recebido" || status === "conferido" || status === "rejeitado") {
           const nome = `${r.label.replace(/[^A-Za-zÀ-ÿ0-9]+/g, "_")}_${s.cliente.nome.split(" ")[0]}.pdf`;
-          await anexo(tx, c, nome, { matterId: m.id, itemId: it.id, quando: ha(Math.max(s.criado - 1, 0)), autor: U.tiago });
+          await anexo(tx, c, nome, { matterId: m.id, itemId: it.id, quando: ha(Math.max(s.criado - 1, 0)), autor: U.carolina });
         }
       }
       if (s.anexoErrado) {
         await anexo(tx, c, s.anexoErrado.nome, {
-          matterId: m.id, itemId: itemIds[s.anexoErrado.item], quando: ha(2), autor: U.tiago,
+          matterId: m.id, itemId: itemIds[s.anexoErrado.item], quando: ha(2), autor: U.carolina,
         });
       }
       for (const [d, autor, kind, resumo] of s.historico) {
@@ -256,7 +256,7 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
           insert into deadlines (organization_id, matter_id, label, due_on, status, created_by,
                                  confirmed_by, confirmed_at)
           values (${orgId}, ${m.id}, ${p.label}, ${dia(p.offset)},
-                  ${p.confirmado ? "confirmado" : "por_confirmar"}, ${U.tiago},
+                  ${p.confirmado ? "confirmado" : "por_confirmar"}, ${U.carolina},
                   ${p.confirmado ? U.marcia : null}, ${p.confirmado ? ha(1) : null})`;
       }
       if (s.pedido) {
@@ -274,7 +274,7 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
                                        created_by, submitted_at, approved_by, approved_at, sent_at,
                                        attempts, last_error, created_at, updated_at)
           values (${orgId}, ${m.id}, ${s.pedido.status}, ${s.cliente.email}, ${assunto}, ${corpo},
-                  ${U.tiago}, ${ha(s.pedido.dias, 2)},
+                  ${U.carolina}, ${ha(s.pedido.dias, 2)},
                   ${s.pedido.status === "a_aguardar_aprovacao" ? null : U.marcia},
                   ${s.pedido.status === "a_aguardar_aprovacao" ? null : ha(s.pedido.dias, 1)},
                   ${enviado ? ha(s.pedido.dias, 1) : null}, ${enviado ? 1 : (s.pedido.tentativas ?? 0)},
@@ -297,15 +297,15 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       insert into inbox_messages (organization_id, from_name, from_email, subject, body, received_at, created_by)
       values (${orgId}, 'Joaquim Pires', 'joaquim.pires@example.pt', 'Documento pedido',
               ${"Bom dia,\n\nSegue em anexo o meu cartão de cidadão, como pediram.\n\nJoaquim Pires"},
-              ${ha(0, 2)}, ${U.tiago}) returning id`;
-    await anexo(tx, c, "Cartao_cidadao_Joaquim_Pires.pdf", { inboxId: e1.id, quando: ha(0, 2), autor: U.tiago });
+              ${ha(0, 2)}, ${U.carolina}) returning id`;
+    await anexo(tx, c, "Cartao_cidadao_Joaquim_Pires.pdf", { inboxId: e1.id, quando: ha(0, 2), autor: U.carolina });
     const [e2] = await tx<{ id: string }[]>`
       insert into inbox_messages (organization_id, from_name, from_email, subject, body, received_at, created_by)
       values (${orgId}, 'Teresa Vaz', 'teresa.vaz@example.pt', 'Pedido de registo de moradia',
               ${"Boa tarde,\n\nGostaria de tratar do registo da moradia que comprei. Envio já a caderneta e a certidão.\n\nObrigada,\nTeresa Vaz"},
-              ${ha(0, 5)}, ${U.tiago}) returning id`;
-    await anexo(tx, c, "Caderneta_predial_Teresa_Vaz.pdf", { inboxId: e2.id, quando: ha(0, 5), autor: U.tiago });
-    await anexo(tx, c, "Certidao_permanente_Teresa_Vaz.pdf", { inboxId: e2.id, quando: ha(0, 5), autor: U.tiago });
+              ${ha(0, 5)}, ${U.carolina}) returning id`;
+    await anexo(tx, c, "Caderneta_predial_Teresa_Vaz.pdf", { inboxId: e2.id, quando: ha(0, 5), autor: U.carolina });
+    await anexo(tx, c, "Certidao_permanente_Teresa_Vaz.pdf", { inboxId: e2.id, quando: ha(0, 5), autor: U.carolina });
   });
   return orgId;
 }

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { entrar } from "./ajuda";
 
 test("triagem: associar um anexo com sugestão e anular", async ({ page }) => {
-  await entrar(page, "tiago@demo.example.pt");
+  await entrar(page, "carolina@demo.example.pt");
   await page.getByRole("link", { name: "Triagem" }).click();
   const cartao = page.locator("li", { hasText: "Cartao_cidadao_Joaquim_Pires.pdf" }).first();
   await expect(cartao.getByLabel("Processo")).toHaveValue(/.+/); // sugestão pré-selecionada
@@ -15,7 +15,7 @@ test("triagem: associar um anexo com sugestão e anular", async ({ page }) => {
 });
 
 test("pedido: falha simulada, reenvio, a bola passa ao cliente e sai de Hoje", async ({ page }) => {
-  await entrar(page, "ines@demo.example.pt");
+  await entrar(page, "marcia@demo.example.pt");
   await page.goto("/configuracoes");
   await page.getByRole("button", { name: "Simular falha no próximo envio" }).click();
   await expect(page.getByText("O próximo envio vai falhar.")).toBeVisible();
@@ -26,7 +26,7 @@ test("pedido: falha simulada, reenvio, a bola passa ao cliente e sai de Hoje", a
   await expect(page.getByLabel("Texto")).toContainText("Título aquisitivo");
   await page.getByRole("button", { name: "Aprovar e enviar" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "O envio falhou" }).first()).toBeVisible();
-  await expect(page.getByTestId("faixa")).toContainText("Aguarda: Márcia Tavares");
+  await expect(page.getByTestId("faixa")).toContainText("Aguarda: Márcia Raposo");
 
   await page.getByRole("button", { name: "Reenviar" }).click();
   await expect(page.getByTestId("faixa")).toContainText("Aguarda: Ana Sofia Lemos (cliente)");
@@ -38,7 +38,7 @@ test("pedido: falha simulada, reenvio, a bola passa ao cliente e sai de Hoje", a
 });
 
 test("retoma: reabrir o processo volta ao separador onde se estava", async ({ page }) => {
-  await entrar(page, "marcia@demo.example.pt");
+  await entrar(page, "joao@demo.example.pt");
   await page.goto("/processos?q=Fernando");
   await page.getByRole("link", { name: /Fernando Batista/ }).click();
   await page.getByRole("tab", { name: "Prazos e seguimento" }).click();
@@ -50,7 +50,7 @@ test("retoma: reabrir o processo volta ao separador onde se estava", async ({ pa
 });
 
 test("teclado: saltar para o conteúdo e navegar nos separadores com setas", async ({ page }) => {
-  await entrar(page, "marcia@demo.example.pt");
+  await entrar(page, "joao@demo.example.pt");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Saltar para o conteúdo" })).toBeFocused();
   await page.goto("/processos?q=Rui");
@@ -62,7 +62,7 @@ test("teclado: saltar para o conteúdo e navegar nos separadores com setas", asy
 });
 
 test("triagem não pode concluir; prazo por confirmar sem botão de confirmar", async ({ page }) => {
-  await entrar(page, "tiago@demo.example.pt");
+  await entrar(page, "carolina@demo.example.pt");
   await page.goto("/processos?q=Fernando");
   await page.getByRole("link", { name: /Fernando Batista/ }).click();
   await expect(page.getByRole("button", { name: "Concluir processo" })).toHaveCount(0);

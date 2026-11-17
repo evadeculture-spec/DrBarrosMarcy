@@ -51,8 +51,9 @@ npm run dev
 ```
 
 Abra **http://demo.localhost:3000** (ou `http://localhost:3000`, que usa
-`DEFAULT_ORG_SLUG`). Contas de demonstração: `ines@` (administradora),
-`marcia@` (solicitadora) e `tiago@demo.example.pt` (triagem), com a
+`DEFAULT_ORG_SLUG`). Contas de demonstração: `marcia@` (Márcia Raposo,
+administradora), `joao@` (João Barros, solicitador) e `carolina@demo.example.pt`
+(Carolina Folgado, triagem), com a
 palavra-passe definida em `SEED_DEMO_PASSWORD`. O segundo escritório de
 demonstração está em **http://norte.localhost:3000** (`paulo@norte.example.pt`).
 

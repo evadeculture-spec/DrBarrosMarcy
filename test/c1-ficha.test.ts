@@ -35,8 +35,8 @@ describe("critério 1: a faixa basta", () => {
     const lido = lerFaixa(f.faixa.texto);
     const verdade = f.itens.filter((i) => i.required && ["em_falta", "rejeitado"].includes(i.status)).length;
     expect(lido.falta).toBe(verdade);
-    expect(lido.aguarda).toBe("Márcia Solicitadora");
-    expect(lido.responsavel).toBe("Márcia Solicitadora");
+    expect(lido.aguarda).toBe("João Barros");
+    expect(lido.responsavel).toBe("João Barros");
     expect(lido.desde).toBe(formatarData(new Date(f.matter.state_since)));
   });
 
@@ -103,7 +103,7 @@ describe("histórico imutável", () => {
     await transicionar(e.triagem, id, "em_conferencia");
     const ev = (await obterFicha(e.triagem, id))!.eventos;
     expect(ev.map((x) => x.kind)).toEqual(["estado", "criado"]);
-    expect(ev[0].actor_name).toBe("Tiago Triagem");
+    expect(ev[0].actor_name).toBe("Carolina Folgado");
     expect(ev[0].summary).toBe("Estado: Por triar → Em conferência");
   });
 

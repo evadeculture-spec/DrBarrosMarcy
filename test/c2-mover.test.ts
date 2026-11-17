@@ -70,7 +70,7 @@ describe("critério 2: mover e anular", () => {
     expect((await obterFicha(e.triagem, b.id))!.matter.state).toBe("em_conferencia");
     const histA = (await obterFicha(e.triagem, a.id))!.eventos.find((x) => x.kind === "anexo_movido")!;
     expect(histA.data).toMatchObject({ origem: { id: a.id }, destino: { id: b.id } });
-    expect(histA.actor_name).toBe("Tiago Triagem");
+    expect(histA.actor_name).toBe("Carolina Folgado");
 
     // …e «Anular» repõe tudo.
     await anularOperacao(e.triagem, eventoId);

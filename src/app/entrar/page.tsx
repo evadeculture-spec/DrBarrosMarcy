@@ -24,9 +24,9 @@ export default async function EntrarPage() {
               <div className="mt-6 rounded-xl border border-border bg-surface p-4 text-sm text-ink">
                 <p className="font-medium">Contas de demonstração</p>
                 <ul className="mt-2 space-y-1 text-muted">
-                  <li>ines@demo.example.pt — administradora</li>
-                  <li>marcia@demo.example.pt — solicitadora</li>
-                  <li>tiago@demo.example.pt — triagem</li>
+                  <li>marcia@demo.example.pt — Márcia Raposo, administradora</li>
+                  <li>joao@demo.example.pt — João Barros, solicitador</li>
+                  <li>carolina@demo.example.pt — Carolina Folgado, triagem</li>
                 </ul>
                 <p className="mt-2 text-muted">Palavra-passe: a definida em SEED_DEMO_PASSWORD.</p>
               </div>
