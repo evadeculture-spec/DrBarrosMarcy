@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
+import { AvisosProvider } from "@/components/avisos";
 
 export const metadata: Metadata = {
-  title: "SolicitaFlow — Gestão de processos para solicitadoria",
-  description:
-    "Organize clientes, prazos, documentos e tarefas do seu escritório de solicitadoria num só lugar.",
+  title: { default: "SolicitaFlow", template: "%s · SolicitaFlow" },
+  description: "Sabe sempre o que falta em cada processo, quem tem de agir e desde quando.",
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
@@ -14,15 +14,11 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-PT">
       <body>
-        <Providers>{children}</Providers>
+        <AvisosProvider>{children}</AvisosProvider>
       </body>
     </html>
   );

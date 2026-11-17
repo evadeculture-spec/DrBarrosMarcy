@@ -4,55 +4,47 @@ import { cn } from "@/lib/utils";
 
 export type StatTone = "default" | "danger" | "warning" | "success";
 
-const tones: Record<StatTone, { icon: string; value: string }> = {
+const tons: Record<StatTone, { icon: string; value: string }> = {
   default: { icon: "bg-bordeaux/10 text-bordeaux", value: "text-ink" },
-  danger: { icon: "bg-red-50 text-danger", value: "text-danger" },
-  warning: { icon: "bg-amber-50 text-warning", value: "text-warning" },
-  success: { icon: "bg-green-50 text-success", value: "text-success" },
+  danger: { icon: "bg-red-50 text-red-700", value: "text-red-700" },
+  warning: { icon: "bg-amber-50 text-amber-800", value: "text-amber-800" },
+  success: { icon: "bg-green-50 text-green-800", value: "text-green-800" },
 };
 
+/** Cartão de indicador: é sempre um atalho para a lista que explica o número. */
 export function StatCard({
   label,
   value,
   icon: Icon,
   tone = "default",
   href,
-  hint,
+  descricao,
 }: {
   label: string;
-  value: number | string;
+  value: number;
   icon: LucideIcon;
   tone?: StatTone;
-  href?: string;
-  hint?: string;
+  href: string;
+  descricao: string;
 }) {
-  const t = tones[tone];
-  const inner = (
-    <div className="flex items-start justify-between gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card transition-shadow hover:shadow-card-hover">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-muted">{label}</p>
-        <p className={cn("mt-1 text-2xl font-semibold tabular-nums", t.value)}>
-          {value}
-        </p>
-        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+  const t = tons[tone];
+  return (
+    <Link
+      href={href}
+      data-indicador={label}
+      title={descricao}
+      className="group block rounded-2xl focus-ring"
+    >
+      <div className="flex h-full items-start justify-between gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card transition-shadow group-hover:shadow-card-hover sm:p-5">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted">{label}</p>
+          <p className={cn("mt-1 text-3xl font-semibold tabular-nums", t.value)}>{value}</p>
+          <p className="sr-only">{descricao}</p>
+        </div>
+        <span aria-hidden className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", t.icon)}>
+          <Icon className="h-5 w-5" />
+        </span>
       </div>
-      <span
-        className={cn(
-          "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-          t.icon,
-        )}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-    </div>
+    </Link>
   );
-
-  if (href) {
-    return (
-      <Link href={href} className="block focus-ring rounded-2xl">
-        {inner}
-      </Link>
-    );
-  }
-  return inner;
 }

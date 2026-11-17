@@ -1,177 +1,101 @@
-"use client";
-
 import Link from "next/link";
-import { notFound, useParams } from "next/navigation";
-import {
-  ArrowLeft,
-  FolderOpen,
-  Mail,
-  MapPin,
-  Phone,
-} from "lucide-react";
-import { PageHeader } from "@/components/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ProcessCard } from "@/components/ProcessCard";
-import { EmptyState } from "@/components/EmptyState";
-import { CLIENT_KIND } from "@/lib/constants";
-import { useStore } from "@/hooks/useStore";
-import { isActive } from "@/lib/selectors";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Mail, MapPin, Phone, Plus } from "lucide-react";
+import { exigirSessao } from "@/server/sessao";
+import { obterCliente } from "@/server/services/clientes";
+import { formatarData } from "@/server/domain/datas";
+import { EstadoProcesso } from "@/components/EstadoProcesso";
+import { EditarCliente } from "./EditarCliente";
 
-export default function ClientDetailPage() {
-  const params = useParams<{ id: string }>();
-  const { clients, matters, documents, timeline } = useStore();
+export async function generateMetadata({ params }: { params: { id: string } }) {
+  const s = await exigirSessao();
+  const f = await obterCliente(s.ctx, params.id);
+  return { title: f ? `${f.cliente.name} (${f.cliente.reference})` : "Cliente" };
+}
 
-  const client = clients.find((c) => c.id === params.id);
-  if (!client) return notFound();
-
-  const clientMatters = matters.filter((m) => m.clientId === client.id);
-  const matterIds = new Set(clientMatters.map((m) => m.id));
-  const clientDocs = documents.filter((d) => matterIds.has(d.matterId));
-  // Timeline agregada de todos os processos do cliente.
-  const clientTimeline = timeline
-    .filter((e) => matterIds.has(e.matterId))
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-
-  const meta = CLIENT_KIND[client.kind];
-  const active = clientMatters.filter(isActive).length;
-
+export default async function FichaClientePage({ params, searchParams }: { params: { id: string }; searchParams: { de?: string } }) {
+  const s = await exigirSessao();
+  const f = await obterCliente(s.ctx, params.id);
+  if (!f) notFound();
+  const voltar = searchParams.de && /^\/(clientes|pesquisa)(\?|$)/.test(searchParams.de) ? searchParams.de : "/clientes";
+  const voltarRotulo = voltar.startsWith("/pesquisa") ? "Voltar aos resultados da pesquisa" : "Voltar à lista de clientes";
+  const c = f.cliente;
   return (
-    <div>
-      <Link
-        href="/clientes"
-        className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-bordeaux"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Voltar aos clientes
+    <div className="space-y-5">
+      <Link href={voltar} className="inline-flex min-h-[44px] items-center gap-1.5 rounded text-sm text-muted hover:text-bordeaux focus-ring" data-testid="voltar-lista">
+        <ArrowLeft aria-hidden className="h-4 w-4" /> {voltarRotulo}
       </Link>
 
-      <PageHeader
-        title={client.name}
-        subtitle={`${meta.label} · ${client.country}`}
-        actions={
-          <Badge className={meta.badge}>
-            {active} processo{active !== 1 ? "s" : ""} ativo
-            {active !== 1 ? "s" : ""}
-          </Badge>
-        }
-      />
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          {/* Processos */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Processos associados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {clientMatters.length === 0 ? (
-                <EmptyState
-                  icon={FolderOpen}
-                  title="Sem processos"
-                  description="Este cliente ainda não tem processos."
-                  className="border-0 bg-transparent py-6"
-                />
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {clientMatters.map((m) => (
-                    <ProcessCard key={m.id} matter={m} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Histórico de comunicações */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Histórico de comunicações</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {clientTimeline.length === 0 ? (
-                <p className="py-4 text-sm text-muted">
-                  Sem comunicações registadas.
-                </p>
-              ) : (
-                <ol className="relative space-y-4 border-l border-border pl-6">
-                  {clientTimeline.slice(0, 8).map((e) => (
-                    <li key={e.id} className="relative">
-                      <span className="absolute -left-[29px] top-1 h-2 w-2 rounded-full bg-bordeaux ring-4 ring-surface" />
-                      <p className="text-sm text-ink">{e.message}</p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </CardContent>
-          </Card>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-sm font-semibold text-bordeaux">{c.reference}</p>
+          <h1 className="text-2xl font-semibold text-ink">{c.name}</h1>
+          <p className="mt-1 text-sm text-muted">
+            {[c.city, c.nif ? `NIF ${c.nif}` : "Sem NIF registado", `cliente desde ${formatarData(c.created_at)}`].filter(Boolean).join(" · ")}
+          </p>
         </div>
+        <Link
+          href={`/processos/novo?cliente=${c.id}`}
+          className="inline-flex h-11 items-center gap-2 rounded-lg bg-bordeaux px-4 text-sm font-medium text-white hover:bg-bordeaux-hover focus-ring"
+        >
+          <Plus aria-hidden className="h-4 w-4" /> Novo processo para este cliente
+        </Link>
+      </header>
 
-        {/* Dados + documentos + notas */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Dados principais</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p className="flex items-center gap-2 text-ink">
-                <Mail className="h-4 w-4 text-muted" />
-                {client.email}
-              </p>
-              <p className="flex items-center gap-2 text-ink">
-                <Phone className="h-4 w-4 text-muted" />
-                {client.phone}
-              </p>
-              <p className="flex items-start gap-2 text-ink">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-                {client.address || "—"}
-              </p>
-              <div className="flex justify-between border-t border-border pt-3">
-                <span className="text-muted">NIF</span>
-                <span className="text-ink">{client.nif}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">País</span>
-                <span className="text-ink">{client.country}</span>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section aria-labelledby="t-contactos" className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+          <h2 id="t-contactos" className="text-base font-semibold text-ink">Contactos</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li className="flex items-center gap-2">
+              <Mail aria-hidden className="h-4 w-4 text-muted" />
+              {c.email ? <a href={`mailto:${c.email}`} className="text-ink underline-offset-2 hover:underline focus-ring rounded">{c.email}</a> : <span className="text-muted">Sem email</span>}
+            </li>
+            <li className="flex items-center gap-2">
+              <Phone aria-hidden className="h-4 w-4 text-muted" />
+              {c.phone ? <a href={`tel:${c.phone.replace(/\s/g, "")}`} className="text-ink underline-offset-2 hover:underline focus-ring rounded">{c.phone}</a> : <span className="text-muted">Sem telefone</span>}
+            </li>
+            <li className="flex items-start gap-2">
+              <MapPin aria-hidden className="mt-0.5 h-4 w-4 text-muted" />
+              <span className="text-ink">{[c.address, c.city].filter(Boolean).join(", ") || <span className="text-muted">Sem morada</span>}</span>
+            </li>
+          </ul>
+          {c.notes && <p className="mt-3 rounded-lg bg-background px-3 py-2 text-sm text-ink">{c.notes}</p>}
+          <EditarCliente cliente={JSON.parse(JSON.stringify(c))} />
+        </section>
 
-          {client.notes && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Notas internas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-ink/80">{client.notes}</p>
-              </CardContent>
-            </Card>
+        <section aria-labelledby="t-proxima" className="rounded-2xl border border-border bg-surface p-5 shadow-card lg:col-span-2">
+          <h2 id="t-proxima" className="text-base font-semibold text-ink">Próxima ação</h2>
+          {f.proximaAcao ? (
+            <p className="mt-2 text-sm text-ink">
+              <Link href={`/processos/${f.proximaAcao.processoId}`} className="font-medium text-bordeaux underline-offset-2 hover:underline focus-ring rounded">
+                {f.proximaAcao.reference}
+              </Link>{" "}
+              — {f.proximaAcao.texto} <span className="text-muted">· {f.proximaAcao.quem}{f.proximaAcao.quando ? ` · ${formatarData(f.proximaAcao.quando)}` : ""}</span>
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Sem processos ativos. Use «Novo processo para este cliente».</p>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Documentos ({clientDocs.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {clientDocs.length === 0 ? (
-                <p className="text-sm text-muted">Sem documentos.</p>
-              ) : (
-                <ul className="space-y-1.5 text-sm">
-                  {clientDocs.map((d) => (
-                    <li
-                      key={d.id}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="truncate text-ink/80">{d.name}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+          <h2 className="mt-5 text-base font-semibold text-ink">Processos ({f.processos.length})</h2>
+          {f.processos.length === 0 ? (
+            <p className="mt-2 rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">Este cliente ainda não tem processos.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
+              {f.processos.map((p) => (
+                <li key={p.id}>
+                  <Link href={`/processos/${p.id}`} className="flex min-h-[56px] flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 hover:bg-background focus-ring">
+                    <span className="font-mono text-sm font-semibold text-bordeaux">{p.reference}</span>
+                    <span className="min-w-0 flex-1 text-sm text-ink">{p.title}</span>
+                    <EstadoProcesso estado={p.state} />
+                    <span className="w-full text-xs text-muted">
+                      {p.proximo_passo} · {p.responsible_name}{p.falta > 0 ? ` · faltam ${p.falta}` : ""}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

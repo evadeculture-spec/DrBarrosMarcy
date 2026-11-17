@@ -1,0 +1,8 @@
+{
+  "slug": "exemplo",
+  "nome": "Escritório Exemplo",
+  "administrador": {
+    "nome": "Administrador Exemplo",
+    "email": "admin@exemplo.example.pt"
+  }
+}

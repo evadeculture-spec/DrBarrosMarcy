@@ -1,200 +1,116 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import { KanbanSquare, Plus, Search, Table2 } from "lucide-react";
-import { PageHeader } from "@/components/PageHeader";
+import Link from "next/link";
+import { exigirSessao } from "@/server/sessao";
+import { listarProcessos, listarUtilizadores } from "@/server/services/processos";
+import { ESTADOS, ESTADO_ROTULO } from "@/server/domain/estados";
+import { calcularFaixa, textoFalta } from "@/server/domain/faixa";
+import { diaLisboa, formatarData, haQuantoTempo } from "@/server/domain/datas";
+import { EstadoProcesso } from "@/components/EstadoProcesso";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/input";
-import { ProcessTable } from "@/components/ProcessTable";
-import { ProcessKanban } from "@/components/ProcessKanban";
-import { EmptyState } from "@/components/EmptyState";
-import {
-  MATTER_STATUS_OPTIONS,
-  MATTER_TYPES,
-  MATTER_TYPE_OPTIONS,
-  PRIORITY_OPTIONS,
-} from "@/lib/constants";
-import { users } from "@/data/users";
-import { useStore } from "@/hooks/useStore";
-import { useUI } from "@/hooks/useUI";
-import { cn } from "@/lib/utils";
-import { FolderOpen } from "lucide-react";
+import { Input, Label, Select } from "@/components/ui/input";
 
-type View = "tabela" | "kanban";
+export const metadata = { title: "Processos" };
 
-export default function ProcessosPage() {
-  const { matters, clients } = useStore();
-  const { openQuickCreate } = useUI();
-
-  const [view, setView] = useState<View>("tabela");
-  const [query, setQuery] = useState("");
-  const [type, setType] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [assignee, setAssignee] = useState("all");
-  const [priority, setPriority] = useState("all");
-
-  const clientName = (id: string) =>
-    clients.find((c) => c.id === id)?.name ?? "";
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return matters.filter((m) => {
-      if (type !== "all" && m.type !== type) return false;
-      if (status !== "all" && m.status !== status) return false;
-      if (assignee !== "all" && m.assigneeId !== assignee) return false;
-      if (priority !== "all" && m.priority !== priority) return false;
-      if (q) {
-        const haystack = `${clientName(m.clientId)} ${m.reference} ${
-          MATTER_TYPES[m.type].label
-        }`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matters, query, type, status, assignee, priority]);
-
-  const resetFilters = () => {
-    setType("all");
-    setStatus("all");
-    setAssignee("all");
-    setPriority("all");
-    setQuery("");
+export default async function ProcessosPage({
+  searchParams,
+}: {
+  searchParams: { estado?: string; responsavel?: string; q?: string; concluidos?: string };
+}) {
+  const s = await exigirSessao();
+  const filtros = {
+    estado: searchParams.estado,
+    responsavel: searchParams.responsavel,
+    q: searchParams.q,
+    incluirConcluidos: searchParams.concluidos === "1",
   };
-
-  const hasFilters =
-    type !== "all" ||
-    status !== "all" ||
-    assignee !== "all" ||
-    priority !== "all" ||
-    query !== "";
+  const [linhas, utilizadores] = await Promise.all([listarProcessos(s.ctx, filtros), listarUtilizadores(s.ctx)]);
+  const hoje = diaLisboa();
+  const filtrado = Boolean(searchParams.estado || searchParams.responsavel || searchParams.q || searchParams.concluidos);
 
   return (
-    <div>
-      <PageHeader
-        title="Processos"
-        subtitle={`${filtered.length} de ${matters.length} processos`}
-        actions={
-          <Button onClick={openQuickCreate}>
-            <Plus className="h-4 w-4" />
-            Novo processo
-          </Button>
-        }
-      />
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold text-ink">Processos</h1>
+        <p className="mt-1 text-sm text-muted">Ordenados por quem está à espera há mais tempo.</p>
+      </header>
 
-      {/* Barra de filtros */}
-      <div className="mb-5 space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pesquisar por cliente, referência ou tipo…"
-              className="pl-9"
-            />
-          </div>
-          <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
-            <button
-              onClick={() => setView("tabela")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                view === "tabela"
-                  ? "bg-bordeaux text-white"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              <Table2 className="h-4 w-4" />
-              Tabela
-            </button>
-            <button
-              onClick={() => setView("kanban")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                view === "kanban"
-                  ? "bg-bordeaux text-white"
-                  : "text-muted hover:text-ink",
-              )}
-            >
-              <KanbanSquare className="h-4 w-4" />
-              Kanban
-            </button>
-          </div>
+      <form className="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_200px_200px_auto]" role="search" aria-label="Filtrar processos">
+        <div>
+          <Label htmlFor="f-q">Procurar</Label>
+          <Input id="f-q" name="q" defaultValue={searchParams.q} placeholder="Referência, título ou cliente" />
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-auto"
-          >
-            <option value="all">Todos os tipos</option>
-            {MATTER_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+        <div>
+          <Label htmlFor="f-estado">Estado</Label>
+          <Select id="f-estado" name="estado" defaultValue={searchParams.estado ?? ""}>
+            <option value="">Todos os ativos</option>
+            {ESTADOS.map((e) => (
+              <option key={e} value={e}>{ESTADO_ROTULO[e]}</option>
             ))}
           </Select>
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="w-auto"
-          >
-            <option value="all">Todos os estados</option>
-            {MATTER_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+        </div>
+        <div>
+          <Label htmlFor="f-resp">Responsável</Label>
+          <Select id="f-resp" name="responsavel" defaultValue={searchParams.responsavel ?? ""}>
+            <option value="">Todos</option>
+            {utilizadores.filter((u) => u.active).map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </Select>
-          <Select
-            value={assignee}
-            onChange={(e) => setAssignee(e.target.value)}
-            className="w-auto"
-          >
-            <option value="all">Todos os responsáveis</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="w-auto"
-          >
-            <option value="all">Todas as prioridades</option>
-            {PRIORITY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={resetFilters}>
+        </div>
+        <div className="flex items-end gap-2">
+          <label className="mb-2.5 flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" name="concluidos" value="1" defaultChecked={filtros.incluirConcluidos} className="h-4 w-4 accent-bordeaux" />
+            Incluir concluídos
+          </label>
+        </div>
+        <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
+          <Button type="submit" variant="outline">Filtrar</Button>
+          {filtrado && (
+            <Link href="/processos" className="inline-flex h-10 items-center px-3 text-sm text-muted hover:text-bordeaux focus-ring rounded-lg">
               Limpar filtros
-            </Button>
+            </Link>
           )}
         </div>
-      </div>
+      </form>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={FolderOpen}
-          title="Nenhum processo encontrado"
-          description="Ajuste os filtros ou crie um novo processo para começar."
-          action={
-            <Button onClick={openQuickCreate}>
-              <Plus className="h-4 w-4" />
-              Criar processo rápido
-            </Button>
-          }
-        />
-      ) : view === "tabela" ? (
-        <ProcessTable matters={filtered} />
+      {linhas.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-10 text-center">
+          <p className="text-sm text-ink">{filtrado ? "Nenhum processo corresponde aos filtros." : "Ainda não há processos."}</p>
+          {!filtrado && (
+            <p className="mt-1 text-sm text-muted">Crie o primeiro com «Novo processo», no topo, ou a partir de um email na Triagem.</p>
+          )}
+        </div>
       ) : (
-        <ProcessKanban matters={filtered} />
+        <ul className="space-y-2" aria-label={`${linhas.length} processos`}>
+          {linhas.map((p) => {
+            const f = calcularFaixa({
+              estado: p.state,
+              desde: p.state_since,
+              responsavel: p.responsible_name,
+              cliente: p.client_name,
+              itens: [],
+            });
+            return (
+              <li key={p.id}>
+                <Link
+                  href={`/processos/${p.id}`}
+                  className="block rounded-2xl border border-border bg-surface p-4 shadow-card transition-shadow hover:shadow-card-hover focus-ring"
+                >
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-mono text-sm font-semibold text-bordeaux">{p.reference}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{p.title}</span>
+                    <EstadoProcesso estado={p.state} />
+                  </div>
+                  <p className="mt-2 text-sm text-muted">
+                    <span className="text-ink">Falta: {textoFalta(p.falta)}</span>
+                    {p.total > 0 && <> de {p.total}</>} · Aguarda: <span className="text-ink">{f.aguarda}</span>{" "}
+                    {p.state !== "concluido" && <>{haQuantoTempo(p.state_since, hoje)}</>} · {p.responsible_name}
+                    {p.follow_up_on && <> · seguimento {formatarData(p.follow_up_on)}</>}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

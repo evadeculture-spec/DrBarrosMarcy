@@ -1,140 +1,176 @@
 # SolicitaFlow
 
-**Gestão inteligente de processos para solicitadoria.**
+**Sabe sempre o que falta em cada processo, quem tem de agir e desde quando.**
 
-SaaS para gestão de processos de um escritório de solicitadoria em Portugal.
-MVP funcional, moderno e responsivo (otimizado para iPad), com dados de
-demonstração realistas em português de Portugal.
+Aplicação web para escritórios de solicitadoria, centrada num percurso:
+receber documentos → conferir → pedir o que falta → retomar quando o cliente
+responde.
 
-Identidade visual branco/off-white + bordeaux. Construído para evoluir para
-base de dados real (Supabase), autenticação e mais.
+- **Dashboard** — sete cartões (cada um abre a lista com o mesmo filtro),
+  Prioridades de hoje e Processos parados por motivo. A vista «Hoje» vive aqui: Um processo aparece
+  quando a equipa tem de agir, desaparece quando a bola passa ao cliente e
+  volta com a resposta ou na data de seguimento.
+- **Ficha do processo** — faixa fixa «Falta: N documentos · Aguarda: quem
+  desde quando · Responsável», lista documental, pedido ao cliente, prazos e
+  histórico imutável.
+- **Triagem** — emails e anexos carregados à mão, associados ao processo
+  certo; mover entre processos com «Anular».
+- **Pedido ao cliente** — rascunho a partir de modelo, aprovação por um
+  solicitador, envio idempotente (reenviar nunca duplica).
+- **Vários escritórios** — um por subdomínio, isolados na base de dados
+  (Row Level Security), ativados só por configuração.
 
----
+## Demonstração com 250 clientes
 
-## 🧱 Stack
+```bash
+# .env.local com DEMO_SEED=1 e SEED_DEMO_PASSWORD (ver .env.example)
+npm run demo:preparar
+```
 
-- **Next.js 14** (App Router) + **TypeScript**
-- **Tailwind CSS** (paleta e tokens personalizados)
-- Componentes reutilizáveis no estilo **shadcn/ui** (feitos à mão)
-- **lucide-react** para ícones
-- Estado em memória via React Context (preparado para Supabase)
+Cria (ou recria) o escritório de demonstração «demo» com **exatamente 250
+clientes fictícios** (referências estáveis CLI-0001…CLI-0250, homónimos,
+nomes acentuados, clientes com vários processos e sem processos) e o
+escritório «norte» para testar o isolamento. Tarefas, prazos, bloqueios e
+pagamentos são coerentes e as datas são relativas ao dia da preparação
+(Europe/Lisbon). Repetir o comando mantém 250 clientes. Recusa correr sem
+`DEMO_SEED=1`, com `NODE_ENV=production` ou sobre um escritório que não esteja
+marcado como demonstração.
 
----
+### Experimentar o percurso em cinco minutos
 
-## 🚀 Correr localmente
+1. Entrar → «Entrada rápida» → **Márcia Raposo** (Solicitadora).
+2. **Dashboard**: os sete cartões abrem a lista que explica cada número.
+3. Pesquisa no topo: escrever `ines` → duas «Inês Faria» (homónimas,
+   distinguidas por referência, localidade e NIF) → abrir a de Castelo Branco.
+4. Na ficha do cliente: **Novo processo para este cliente** (cliente já
+   escolhido) → tipo «Habilitação de herdeiros» → Criar.
+5. Na ficha do processo: **Simular resposta do cliente (3 anexos)** → em
+   Receção, confirmar as sugestões; o anexo que é de outro processo está
+   identificado. Associar, pré-visualizar, e corrigir enganos com «Mover» na
+   ficha (fica no histórico dos dois processos).
+6. Separador **Tarefas**: há uma única tarefa de revisão. Validar os
+   documentos em **Documentos** fecha-a; nova documentação reabre a mesma.
+7. **Pedido ao cliente** → Preparar → Copiar texto → (opcional) Registar envio
+   externo. Copiar não marca como enviado.
+8. Mudar o **Responsável** para Carolina Folgado e recarregar: próxima ação,
+   responsável e última decisão mantêm-se.
+
+## Stack
+
+Next.js 14 (App Router, Server Components e Server Actions) · TypeScript ·
+Tailwind · PostgreSQL 15+ (qualquer fornecedor, incluindo Supabase) ·
+`postgres` (driver SQL) · `zod` · Vitest · Playwright + axe.
+
+## Correr localmente
+
+Precisa de Node 22 e PostgreSQL 15 ou superior.
 
 ```bash
 npm install
+cp .env.example .env.local   # e preencha
+```
+
+Na base de dados, crie dois papéis — o dono do esquema (migrações) e o da
+aplicação (sem `BYPASSRLS`, não dono das tabelas):
+
+```sql
+create role sf_owner login password '…';
+create role sf_app   login password '…';
+create database solicitaflow owner sf_owner;
+```
+
+Depois:
+
+```bash
+npm run db:seed     # APAGA e recria a BD local com dados de demonstração
 npm run dev
 ```
 
-Abra **http://localhost:3000**.
+Abra **http://demo.localhost:3000** (ou `http://localhost:3000`, que usa
+`DEFAULT_ORG_SLUG`). Contas de demonstração: `joao@` (João Barros,
+administrador), `marcia@` (Márcia Raposo, solicitadora) e
+`carolina@demo.example.pt` (Carolina Folgado, solicitadora), com a
+palavra-passe definida em `SEED_DEMO_PASSWORD`. O segundo escritório de
+demonstração está em **http://norte.localhost:3000** (`paulo@norte.example.pt`).
 
-- Na página inicial, clique em **Entrar no escritório**.
-- No login, escolha um perfil (Márcia, João ou Carolina) — qualquer
-  palavra-passe é aceite (login mock).
-- Pode também ir diretamente a `/dashboard`.
+Os dados de demonstração são fictícios e as datas são sempre relativas ao dia
+em que corre o seed.
 
-Outros comandos:
+## Ativar um novo escritório
+
+Sem alterar código:
 
 ```bash
-npm run build   # build de produção
-npm run start   # servir o build
-npm run lint    # ESLint
+npm run escritorio:ativar -- config/escritorios/exemplo.json
 ```
 
----
+O ficheiro indica `slug` (subdomínio), nome, administrador e, opcionalmente,
+tipos de processo e listas documentais (por omissão usa
+`config/listas-documentais.exemplo.json`). A palavra-passe inicial vem de
+`ESCRITORIO_ADMIN_PASSWORD` ou é gerada e mostrada uma vez.
 
-## 🗺️ Páginas disponíveis
+> As listas documentais são **exemplos configuráveis por escritório**, não
+> requisitos legais confirmados.
 
-| Rota | Descrição |
-|------|-----------|
-| `/` | Landing page do produto |
-| `/login` | Login mock (escolha de perfil) |
-| `/dashboard` | "Hoje no escritório": estatísticas, prioridades e processos parados |
-| `/processos` | Lista de processos com filtros, vista tabela e kanban |
-| `/processos/[id]` | Processo individual com tabs (Resumo, Checklist, Tarefas, Documentos, Histórico, Comunicações) |
-| `/clientes` | Lista de clientes |
-| `/clientes/[id]` | Ficha do cliente |
-| `/tarefas` | Tarefas com separadores (Hoje, Semana, Vencidas, Sem prazo, Concluídas) |
-| `/documentos` | Documentos em falta + geração de email |
-| `/templates` | Templates de email editáveis |
-| `/importar` | Importação de processos por CSV (UI + validação) |
-| `/configuracoes` | Utilizadores, tipos/estados, checklists, notificações, escritório |
+## Testes
 
-**Pesquisa global:** `⌘K` / `Ctrl+K` em qualquer página.
-
----
-
-## 🏗️ Arquitetura
-
-```
-src/
-├─ app/                  # App Router (landing, login, grupo (app) autenticado)
-│  └─ (app)/             # Shell com sidebar + topbar
-├─ components/           # Componentes reutilizáveis
-│  ├─ ui/                # Primitivos (button, card, badge, input, modal, tabs…)
-│  └─ layout/            # Sidebar, Topbar, AppShell
-├─ data/                 # Dados mock (users, clients, matters, tasks, documents, timeline, templates)
-├─ hooks/                # useSession (auth mock), useStore (estado), useUI
-├─ lib/                  # utils, constants, selectors, checklists, email, security
-├─ types/                # Tipos de domínio TypeScript
-└─ utils/                # Utilitários de data (pt-PT)
+```bash
+npm run lint && npm run typecheck
+npm test            # regras de negócio e critérios 1–7 contra Postgres real
+npm run build
+npm run test:e2e    # browser: critérios 1 e 5, fluxos, WCAG AA (axe) a 1280/768/375 px
 ```
 
-Componentes-chave: `StatCard`, `ProcessCard`, `ProcessTable`, `ProcessKanban`,
-`StatusBadge`, `PriorityBadge`, `PageHeader`, `EmptyState`,
-`QuickCreateProcessModal`, `ChecklistPanel`, `Timeline`, `DocumentList`,
-`TaskList`, `EmailTemplatePreview`, `GlobalSearch`.
+`npm test` usa `.env.test.local` (base de dados com «test» no nome, recriada a
+cada execução). `npm run test:e2e` usa `.env.e2e.local` (base de dados com «e2e»
+no nome) e precisa de `npm run build` antes.
 
----
+| Critério | Onde |
+|---|---|
+| 1. A faixa basta para saber o que falta e quem age | `test/c1-ficha.test.ts`, `e2e/criterios.spec.ts` |
+| 2. Mover e anular repõe os dois processos | `test/c2-mover.test.ts`, `e2e/fluxo.spec.ts` |
+| 3. Falha + 3 reenvios = 1 pedido | `test/c3-idempotencia.test.ts`, `e2e/fluxo.spec.ts` |
+| 4. Prazo por confirmar sem alertas nem contadores | `test/c4-prazos.test.ts`, `test/dominio.test.ts` |
+| 5. Isolamento entre escritórios | `test/c5-isolamento.test.ts`, `e2e/criterios.spec.ts` |
+| 6. Exportar, apagar, restaurar (SHA-256) | `test/c6-exportar.test.ts` |
+| 7. Novo escritório só por configuração | `test/c7-novo-escritorio.test.ts` |
 
-## ▲ Deploy na Vercel
+## Arquitetura
 
-1. Faça push do repositório para o GitHub.
-2. Em [vercel.com](https://vercel.com), **New Project → Import** o repositório.
-3. A Vercel deteta Next.js automaticamente — não é preciso configurar nada.
-4. **Deploy**. Pronto.
+```
+src/server/domain     regras puras: estados, faixa, Hoje, papéis, datas (Lisboa)
+src/server/services   casos de uso; tudo via withTenant() (RLS por escritório)
+src/server/db.ts      ligação; define app.org_id/app.user_id por transação
+db/migrations         esquema, RLS, histórico imutável, purga controlada
+src/app               páginas (Server Components) e Server Actions finas
+src/middleware.ts     resolve o escritório pelo subdomínio
+```
 
-Não há variáveis de ambiente necessárias no MVP (dados em memória).
+Segurança: sessões com token aleatório (só o hash na BD), cookies `httpOnly`
+e `SameSite=Lax`, palavras-passe com scrypt, isolamento imposto por RLS e
+chaves estrangeiras compostas, anexos guardados na BD sob as mesmas políticas
+e servidos com `Content-Disposition: attachment` e `nosniff`.
 
----
+## Deploy
 
-## 🔌 Próximos passos: ligar a Supabase
+### Netlify (demonstração publicada)
 
-A estrutura já está preparada para esta migração:
+https://solicitaflow-demo.netlify.app — usa o Netlify Database (Postgres). A
+ligação do Netlify é a do dono da BD; com `DATABASE_SET_ROLE` cada transação
+assume um papel restrito, sujeito a RLS. Variáveis do projeto: `AUTO_MIGRAR=1`
+(aplica migrações no primeiro acesso), `DATABASE_SET_ROLE=sf_app`,
+`DEFAULT_ORG_SLUG=demo`, `DEMO_SEED=1` + `SEED_DEMO_PASSWORD` (cria a
+demonstração se a BD estiver vazia), `DEMO_ENTRADA_RAPIDA=1` (barra de entrada
+num clique, sem palavra-passe, só no escritório «demo» e só para as três contas
+de demonstração — nunca ativar numa instalação real).
+O adaptador `@netlify/plugin-nextjs` está declarado em `netlify.toml`.
 
-1. **Criar projeto Supabase** e definir variáveis em `.env.local`:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=...
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-   ```
-2. **Schema**: criar tabelas a partir dos tipos em `src/types/index.ts`
-   (`organizations`, `users`, `clients`, `matters`, `checklist_items`,
-   `documents`, `tasks`, `timeline_events`, `email_templates`). Todas as
-   entidades já têm `organizationId` para multi-tenant.
-3. **Auth**: substituir `src/hooks/useSession.tsx` por Supabase Auth (ou Clerk).
-4. **Dados**: substituir `src/hooks/useStore.tsx` por queries Supabase
-   (idealmente com React Query). As ações do store mapeiam 1:1 para mutações.
-5. **RLS (Row Level Security)**: ativar políticas de isolamento por
-   organização — ver exemplos em `src/lib/security.ts`.
-6. **Storage**: documentos em bucket privado, servidos por URL assinada.
+### Outros alojamentos
 
-Os pontos a reforçar para produção estão marcados no código com
-`// SECURITY:` e documentados em `src/lib/security.ts`.
+Funciona em qualquer alojamento Node (Vercel incluída) com um PostgreSQL
+acessível. Variáveis: ver `.env.example`. Para subdomínios por escritório,
+defina `APP_BASE_DOMAIN` (ex.: `solicitaflow.pt`) e um domínio curinga
+(`*.solicitaflow.pt`). Corra `npm run db:migrar` a cada versão.
+Nunca corra `db:seed` em produção (recusa com `NODE_ENV=production`).
 
----
-
-## 🔒 Segurança e RGPD (MVP)
-
-Este MVP usa dados mock e proteção de rotas apenas no cliente. Antes de
-produção com dados reais é obrigatório: autenticação real, validação no
-servidor, RLS por organização, logs de auditoria e tratamento de dados
-pessoais segundo o RGPD. Ver `src/lib/security.ts`.
-
----
-
-## 🛣️ Evoluções futuras
-
-Base de dados real · autenticação · portal do cliente · assistente de IA ·
-integrações (AT, conservatórias) · faturação · upload real de documentos.
+Mais detalhe: `docs/ESTADO.md` (o que existe e o que falta) e `docs/PLANO.md`.
