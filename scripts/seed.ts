@@ -7,7 +7,7 @@
  */
 import { adminDb, closeDb, type Sql } from "../src/server/db";
 import { migrate } from "../src/server/migrate";
-import { criarDadosDemo } from "../src/server/demo";
+import { prepararDemo } from "../src/server/demo";
 
 async function reset(sql: Sql, papel: string) {
   await sql.unsafe(`
@@ -28,7 +28,7 @@ async function main() {
   const sql = adminDb();
   await reset(sql, papel);
   await migrate(sql, papel);
-  await criarDadosDemo(sql, palavraPasse);
+  await prepararDemo(sql, palavraPasse);
   console.log("Dados de demonstração criados (escritórios «demo» e «norte»).");
   console.log("Entrar: http://demo.localhost:3000 — marcia@ / joao@ / carolina@demo.example.pt");
 }
