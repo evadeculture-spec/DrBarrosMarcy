@@ -10,6 +10,7 @@ import { z } from "zod";
 import { withTenant, type Tx } from "../db";
 import { ErroNegocio, exigir, exigirUuid, registarEvento, type Ctx } from "./comum";
 import { sha256 } from "./triagem";
+import { proximaReferenciaCliente } from "./clientes";
 
 export const FORMATO_PROCESSO = "solicitaflow.processo";
 export const FORMATO_ESCRITORIO = "solicitaflow.escritorio";
@@ -38,7 +39,8 @@ export async function exportarProcesso(ctx: Ctx, matterId: string) {
   return withTenant(ctx, async (tx) => {
     const [processo] = await tx<Linha[]>`
       select id, organization_id, year, number, reference, client_id, matter_type_id, title,
-             state, state_since, responsible_id, follow_up_on, created_at, updated_at
+             state, state_since, responsible_id, follow_up_on, created_at, updated_at,
+             valor_previsto, valor_pago, bloqueio_motivo, bloqueio_nota, bloqueio_revisao, proxima_acao
       from matters where id = ${matterId}`;
     if (!processo) throw new ErroNegocio("Processo não encontrado.", "nao_encontrado");
     const [cliente] = await tx<Linha[]>`select * from clients where id = ${processo.client_id as string}`;
@@ -63,6 +65,7 @@ export async function exportarProcesso(ctx: Ctx, matterId: string) {
         where r.matter_id = ${matterId}`,
       eventos: await tx<Linha[]>`
         select * from events where matter_id = ${matterId} order by created_at, id`,
+      tarefas: await tx<Linha[]>`select * from tasks where matter_id = ${matterId}`,
     };
   });
 }
@@ -102,6 +105,7 @@ const ExportacaoSchema = z.object({
   mensagensSaida: z.array(L),
   tentativas: z.array(L),
   eventos: z.array(L),
+  tarefas: z.array(L).optional(),
 });
 
 const s = (v: unknown) => (v === null || v === undefined ? null : String(v));
@@ -150,11 +154,12 @@ export async function restaurarProcesso(
     let clienteId = s(e.cliente.id);
     const [cli] = await tx`select 1 from clients where id = ${clienteId}`;
     if (!cli) {
+      const referencia = await proximaReferenciaCliente(tx, ctx.orgId);
       const [novo] = await tx<{ id: string }[]>`
-        insert into clients (organization_id, name, email, phone, notes, created_at)
-        values (${ctx.orgId}, ${s(e.cliente.name) ?? "Cliente"}, ${s(e.cliente.email)},
-                ${s(e.cliente.phone)}, ${s(e.cliente.notes)},
-                ${s(e.cliente.created_at) ?? new Date().toISOString()})
+        insert into clients (organization_id, reference, name, email, phone, nif, city, address, notes, created_at)
+        values (${ctx.orgId}, ${referencia}, ${s(e.cliente.name) ?? "Cliente"}, ${s(e.cliente.email)},
+                ${s(e.cliente.phone)}, null, ${s(e.cliente.city)}, ${s(e.cliente.address)},
+                ${s(e.cliente.notes)}, ${s(e.cliente.created_at) ?? new Date().toISOString()})
         returning id`;
       clienteId = novo.id;
     }
@@ -164,11 +169,15 @@ export async function restaurarProcesso(
 
     await tx`
       insert into matters (id, organization_id, year, number, client_id, matter_type_id, title,
-                           state, state_since, responsible_id, follow_up_on, created_at, updated_at)
+                           state, state_since, responsible_id, follow_up_on, created_at, updated_at,
+                           valor_previsto, valor_pago, bloqueio_motivo, bloqueio_nota, bloqueio_revisao,
+                           proxima_acao)
       values (${s(p.id)}, ${ctx.orgId}, ${Number(p.year)}, ${Number(p.number)}, ${clienteId},
               ${tipo.id}, ${s(p.title)}, ${s(p.state)}, ${s(p.state_since)},
               ${userOu(p.responsible_id, ctx.userId)}, ${s(p.follow_up_on)},
-              ${s(p.created_at)}, ${s(p.updated_at)})`;
+              ${s(p.created_at)}, ${s(p.updated_at)}, ${s(p.valor_previsto)},
+              ${s(p.valor_pago) ?? "0"}, ${s(p.bloqueio_motivo)}, ${s(p.bloqueio_nota)},
+              ${s(p.bloqueio_revisao)}, ${s(p.proxima_acao)})`;
 
     for (const i of e.itens) {
       await tx`
@@ -222,6 +231,15 @@ export async function restaurarProcesso(
         values (${s(t.id)}, ${ctx.orgId}, ${s(t.request_id)}, ${s(t.attempted_at)}, ${Boolean(t.ok)},
                 ${s(t.error)})`;
     }
+    for (const t of e.tarefas ?? []) {
+      await tx`
+        insert into tasks (id, organization_id, matter_id, kind, title, assignee_id, due_on, status,
+                           created_by, completed_by, completed_at, created_at, updated_at)
+        values (${s(t.id)}, ${ctx.orgId}, ${s(p.id)}, ${s(t.kind)}, ${s(t.title)},
+                ${userOu(t.assignee_id, ctx.userId)}, ${s(t.due_on)}, ${s(t.status)},
+                ${userOu(t.created_by, null)}, ${userOu(t.completed_by, null)},
+                ${s(t.completed_at)}, ${s(t.created_at)}, ${s(t.updated_at)})`;
+    }
     for (const ev of e.eventos) {
       await tx`
         insert into events (id, organization_id, matter_id, actor_id, kind, summary, data, created_at)
@@ -262,6 +280,7 @@ export async function exportarEscritorio(ctx: Ctx) {
     emails: await tx<Linha[]>`select * from inbox_messages order by received_at`,
     anexos: await anexosComConteudo(tx, {}),
     prazos: await tx<Linha[]>`select * from deadlines order by due_on`,
+    tarefas: await tx<Linha[]>`select * from tasks order by created_at`,
     pedidos: await tx<Linha[]>`select * from client_requests order by created_at`,
     mensagensSaida: await tx<Linha[]>`select * from outbound_messages order by sent_at`,
     tentativas: await tx<Linha[]>`select * from send_attempts order by attempted_at`,

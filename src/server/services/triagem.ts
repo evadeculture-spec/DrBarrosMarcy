@@ -6,9 +6,11 @@
  * a fotografia «antes» — só se nada tiver mudado entretanto.
  */
 import { createHash } from "node:crypto";
+import { normalizar as normalizarTexto } from "./clientes";
 import { withTenant, type Tx } from "../db";
 import { ESTADO_ROTULO, type Estado } from "../domain/estados";
 import type { EstadoItem } from "../domain/faixa";
+import { fecharRevisaoSeConcluida, garantirRevisao } from "./tarefas";
 import {
   bloquearProcesso,
   ErroNegocio,
@@ -97,8 +99,17 @@ export interface NovoEmail {
   assunto?: string;
   corpo?: string;
   recebidoEm?: string | null;
+  /** Como chegou: email, entregue em mão, correio ou outro. */
+  origem?: string | null;
   ficheiros: FicheiroNovo[];
 }
+
+export const ORIGENS = {
+  email: "Email",
+  entregue_em_mao: "Entregue em mão",
+  correio: "Correio",
+  outro: "Outro",
+} as const;
 
 export async function carregarEmail(ctx: Ctx, e: NovoEmail): Promise<{ id: string; anexos: string[] }> {
   validarFicheiros(e.ficheiros);
@@ -111,6 +122,7 @@ export async function carregarEmail(ctx: Ctx, e: NovoEmail): Promise<{ id: strin
   if (!e.assunto?.trim() && !e.corpo?.trim() && e.ficheiros.length === 0) {
     throw new ErroNegocio("O email está vazio: indique assunto, texto ou anexos.");
   }
+  const origem = e.origem && e.origem in ORIGENS ? e.origem : "email";
   const recebido = e.recebidoEm && !Number.isNaN(Date.parse(e.recebidoEm))
     ? new Date(e.recebidoEm)
     : new Date();
@@ -118,9 +130,9 @@ export async function carregarEmail(ctx: Ctx, e: NovoEmail): Promise<{ id: strin
   return withTenant(ctx, async (tx) => {
     const [m] = await tx<{ id: string }[]>`
       insert into inbox_messages (organization_id, from_name, from_email, subject, body,
-                                  received_at, created_by)
+                                  received_at, created_by, origem)
       values (${ctx.orgId}, ${nome}, ${email}, ${e.assunto?.trim() ?? ""},
-              ${e.corpo ?? ""}, ${recebido}, ${ctx.userId})
+              ${e.corpo ?? ""}, ${recebido}, ${ctx.userId}, ${origem})
       returning id`;
     const anexos: string[] = [];
     for (const f of e.ficheiros) anexos.push(await inserirAnexo(tx, ctx, f, m.id));
@@ -142,10 +154,13 @@ export interface AnexoCaixa {
   matter_id: string | null;
   matter_reference: string | null;
   item_label: string | null;
+  /** Sugestão (heurística, sem IA) de processo e documento; a pessoa confirma. */
+  sugestao: { matterId: string; reference: string; cliente: string; itemId: string | null; itemLabel: string | null } | null;
 }
 
 export interface EmailCaixa {
   id: string;
+  origem: keyof typeof ORIGENS;
   from_name: string | null;
   from_email: string | null;
   subject: string;
@@ -163,7 +178,7 @@ export async function listarCaixa(
 ): Promise<EmailCaixa[]> {
   return withTenant(ctx, async (tx) => {
     const emails = await tx<Omit<EmailCaixa, "anexos" | "sugestoes">[]>`
-      select id, from_name, from_email, subject, body, received_at, archived_at
+      select id, from_name, from_email, subject, body, received_at, archived_at, origem
       from inbox_messages
       where (${opcoes.arquivados ?? false} and archived_at is not null)
          or (not ${opcoes.arquivados ?? false} and archived_at is null)
@@ -171,7 +186,7 @@ export async function listarCaixa(
       limit 200`;
     if (emails.length === 0) return [];
     const ids = emails.map((e) => e.id);
-    const anexos = await tx<(AnexoCaixa & { inbox_message_id: string })[]>`
+    const anexos = await tx<(Omit<AnexoCaixa, "sugestao"> & { inbox_message_id: string })[]>`
       select a.id, a.filename, a.mime_type, a.size_bytes, a.matter_id, a.inbox_message_id,
              m.reference as matter_reference, i.label as item_label
       from attachments a
@@ -187,9 +202,52 @@ export async function listarCaixa(
           where lower(c.email) = any(${remetentes}::text[]) and m.state <> 'concluido'
           order by m.state_since`
       : [];
+    // Candidatos para sugestão: processos ativos, clientes e documentos em falta.
+    const candidatos = await tx<{ id: string; reference: string; client_name: string; email: string | null; item_id: string | null; label: string | null }[]>`
+      select m.id, m.reference, c.name as client_name, lower(c.email) as email, i.id as item_id, i.label
+      from matters m join clients c on c.id = m.client_id
+      left join matter_items i on i.matter_id = m.id and i.status in ('em_falta', 'rejeitado')
+      where m.state <> 'concluido'`;
+    const sugerir = (filename: string, remetente: string | null): AnexoCaixa["sugestao"] => {
+      const nome = normalizarTexto(filename.replace(/\.[a-z0-9]+$/i, "").replace(/[_\-.]+/g, " "));
+      const palavras = new Set(nome.split(/\s+/).filter((w) => w.length > 2));
+      // 1. Nome do cliente no nome do ficheiro tem precedência sobre o remetente.
+      let porNome = candidatos.filter((c) => {
+        const partes = normalizarTexto(c.client_name).split(/\s+/).filter((w) => w.length > 2);
+        return partes.length >= 2 && partes.every((w) => palavras.has(w));
+      });
+      if (porNome.length === 0 && remetente) porNome = candidatos.filter((c) => c.email === remetente);
+      if (porNome.length === 0) return null;
+      // Pontuação por processo: palavras do documento em falta presentes no nome do ficheiro.
+      const melhorPorProcesso = new Map<string, { pontos: number; linha: (typeof porNome)[number] }>();
+      for (const l of porNome) {
+        let pontos = 0;
+        if (l.label) {
+          const ws = normalizarTexto(l.label).split(/\s+/).filter((w) => w.length > 3);
+          pontos = ws.filter((w) => palavras.has(w)).length;
+        }
+        const atual = melhorPorProcesso.get(l.id);
+        if (!atual || pontos > atual.pontos) melhorPorProcesso.set(l.id, { pontos, linha: l });
+      }
+      const ordenados = [...melhorPorProcesso.values()].sort((a, b) => b.pontos - a.pontos);
+      let escolhido: (typeof ordenados)[number] | undefined;
+      if (ordenados.length === 1) escolhido = ordenados[0];
+      else if (ordenados[0].pontos > 0 && ordenados[0].pontos > ordenados[1].pontos) escolhido = ordenados[0];
+      if (!escolhido) return null; // ambíguo: decide a pessoa
+      const base = escolhido.linha;
+      return {
+        matterId: base.id,
+        reference: base.reference,
+        cliente: base.client_name,
+        itemId: escolhido.pontos >= 1 ? base.item_id : null,
+        itemLabel: escolhido.pontos >= 1 ? base.label : null,
+      };
+    };
     return emails.map((e) => ({
       ...e,
-      anexos: anexos.filter((a) => a.inbox_message_id === e.id),
+      anexos: anexos
+        .filter((a) => a.inbox_message_id === e.id)
+        .map((a) => ({ ...a, sugestao: a.matter_id ? null : sugerir(a.filename, e.from_email) })),
       sugestoes: sugestoes
         .filter((s) => e.from_email && s.email === e.from_email)
         .map(({ id, reference, title }) => ({ id, reference, title })),
@@ -271,6 +329,7 @@ async function aoEntrarDocumento(
     if (item.status === "em_falta" || item.status === "rejeitado") {
       await tx`update matter_items set status = 'recebido', updated_at = now() where id = ${itemId}`;
     }
+    if (item.status !== "conferido") await garantirRevisao(tx, ctx, m.id, motivo);
   }
   if (m.state === "por_triar") {
     await mudarEstadoSistema(tx, ctx, m, "em_conferencia", motivo);
@@ -421,6 +480,7 @@ export async function moverAnexo(
 
     await tx`update attachments set matter_id = ${destinoId}, item_id = ${itemDestinoId} where id = ${anexoId}`;
     await aoSairDocumento(tx, ctx, origem, anexoId, a.item_id);
+    await fecharRevisaoSeConcluida(tx, ctx, origemId);
     await aoEntrarDocumento(tx, ctx, destino, itemDestinoId, "documento movido de outro processo");
 
     const depois = await fotografar(tx, anexoId, itens, processos);
@@ -491,6 +551,7 @@ export async function anularOperacao(ctx: Ctx, eventoId: string): Promise<void> 
                            updated_at = ${p.updated_at}::text::timestamptz
         where id = ${p.id}`;
     }
+    for (const p of antes.processos) await fecharRevisaoSeConcluida(tx, ctx, p.id);
     for (const p of antes.processos) {
       const estadoAntes = p.state;
       const estadoDepois = depois.processos.find((d) => d.id === p.id)?.state;
@@ -521,5 +582,62 @@ export async function lerAnexo(ctx: Ctx, anexoId: string) {
       from attachments a join attachment_blobs b on b.attachment_id = a.id
       where a.id = ${anexoId}`;
     return r ?? null;
+  });
+}
+
+
+/**
+ * Demonstração: simula a resposta do cliente com três anexos — até dois
+ * documentos em falta deste processo e um que pertence a outro processo.
+ * Fica pelo menos um documento obrigatório em falta quando possível.
+ */
+export async function simularRececao(ctx: Ctx, matterId: string, pdf: (texto: string) => Buffer) {
+  exigirUuid(matterId, "Processo");
+  const dados = await withTenant(ctx, async (tx) => {
+    const [m] = await tx<{ reference: string; client_name: string; client_email: string | null }[]>`
+      select m.reference, c.name as client_name, c.email as client_email
+      from matters m join clients c on c.id = m.client_id where m.id = ${matterId}`;
+    if (!m) throw new ErroNegocio("Processo não encontrado.", "nao_encontrado");
+    const emFalta = await tx<{ label: string }[]>`
+      select label from matter_items where matter_id = ${matterId} and required
+        and status in ('em_falta', 'rejeitado') order by position`;
+    const [outro] = await tx<{ client_name: string; label: string }[]>`
+      select c.name as client_name, i.label from matters o join clients c on c.id = o.client_id
+      join matter_items i on i.matter_id = o.id and i.status = 'em_falta'
+      where o.id <> ${matterId} and o.state <> 'concluido' and o.client_id <> (select client_id from matters where id = ${matterId})
+      order by o.year desc, o.number desc, i.position limit 1`;
+    return { m, emFalta, outro };
+  });
+  const { m, emFalta, outro } = dados;
+  const arquivo = (label: string, cliente: string) =>
+    `${label.replace(/[^A-Za-zÀ-ÿ0-9]+/g, "_").replace(/^_|_$/g, "")}_${cliente.replace(/[^A-Za-zÀ-ÿ0-9]+/g, "_")}.pdf`;
+  // Deixa um documento obrigatório em falta (se houver mais do que um).
+  const enviar = emFalta.slice(0, Math.max(0, Math.min(2, emFalta.length - 1)));
+  const ficheiros: FicheiroNovo[] = enviar.map((i) => ({
+    filename: arquivo(i.label, m.client_name),
+    mimeType: "application/pdf",
+    content: pdf(`${i.label} - ${m.client_name} (demonstracao)`),
+  }));
+  while (ficheiros.length < 2) {
+    ficheiros.push({
+      filename: `Documento_adicional_${ficheiros.length + 1}_${m.client_name.replace(/\s+/g, "_")}.pdf`,
+      mimeType: "application/pdf",
+      content: pdf(`Documento adicional - ${m.client_name} (demonstracao)`),
+    });
+  }
+  if (outro) {
+    ficheiros.push({
+      filename: arquivo(outro.label, outro.client_name),
+      mimeType: "application/pdf",
+      content: pdf(`${outro.label} - ${outro.client_name} (demonstracao)`),
+    });
+  }
+  return carregarEmail(ctx, {
+    remetenteNome: m.client_name,
+    remetenteEmail: m.client_email ?? undefined,
+    assunto: `Re: Processo ${m.reference} — documentos`,
+    corpo: `Bom dia,\n\nEnvio os documentos pedidos.\n\nCumprimentos,\n${m.client_name}`,
+    origem: "email",
+    ficheiros,
   });
 }

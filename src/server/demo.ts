@@ -9,6 +9,7 @@ import { ativarEscritorio } from "./services/escritorios";
 import { sha256 } from "./services/triagem";
 import { diaLisboa, somarDias } from "./domain/datas";
 import type { Estado } from "./domain/estados";
+import { clientesDemo, gerarAtividade, TOTAL_CLIENTES } from "./demo-carteira";
 
 const DIA = 86_400_000;
 let agora = Date.now();
@@ -100,6 +101,7 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
     await tx`update users set forma_tratamento = 'masculino' where id = ${adminId}`;
     await tx`update users set forma_tratamento = 'feminino' where id in (${marcia.id}, ${carolina.id})`;
     const c = { orgId, userId: adminId };
+    await tx`update organizations set settings = settings || '{"demo": true, "localidade": "Castelo Branco"}'::jsonb where id = ${orgId}`;
 
     const tipos = Object.fromEntries(
       (await tx<{ id: string; key: string }[]>`select id, key from matter_types`).map((t) => [t.key, t.id]),
@@ -107,6 +109,25 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
     const ano = Number(hoje.slice(0, 4));
 
     const specs: Especificacao[] = [
+      {
+        numero: 30, cliente: { nome: "Inês Faria", email: "ines.faria@example.pt", telefone: "" },
+        tipo: "procuracao", estado: "a_aguardar_cliente", desde: ha(4), criado: 9,
+        responsavel: "marcia", seguimento: 3, itens: ["conferido", "em_falta", "conferido"],
+        historico: [
+          [9, "carolina", "criado", "Processo criado (Procuração)."],
+          [4, "marcia", "pedido_enviado", "Pedido enviado para ines.faria@example.pt."],
+        ],
+        pedido: { status: "enviado", dias: 4 },
+      },
+      {
+        numero: 29, cliente: { nome: "Inês Faria", email: "ines.faria.lx@example.pt", telefone: "" },
+        tipo: "arrendamento", estado: "concluido", desde: ha(20), criado: 40,
+        responsavel: "joao", seguimento: null, itens: ["conferido", "conferido", "conferido", "conferido"],
+        historico: [
+          [40, "carolina", "criado", "Processo criado (Contrato de arrendamento)."],
+          [20, "joao", "estado", "Estado: Completo → Concluído"],
+        ],
+      },
       {
         numero: 41, cliente: { nome: "Rui Fonseca", email: "rui.fonseca@example.pt", telefone: "+351 900 000 101" },
         tipo: "habilitacao_herdeiros", estado: "resposta_por_conferir", desde: ha(0, 3), criado: 16,
@@ -216,11 +237,23 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       },
     ];
 
+    // Carteira completa: exatamente 250 clientes com identificadores estáveis.
+    const fixos = [
+      ...specs.filter((x) => !x.cliente.email.startsWith("ines.faria")).map((x) => ({ nome: x.cliente.nome, email: x.cliente.email })),
+      { nome: "Teresa Vaz", email: "teresa.vaz@example.pt", cidade: "Alcains", nota: "Primeiro contacto por email." },
+    ];
+    const carteira = clientesDemo(fixos);
+    if (carteira.length !== TOTAL_CLIENTES) throw new Error("A carteira de demonstração tem de ter 250 clientes.");
+    for (let i = 0; i < carteira.length; i += 125) {
+      await tx`insert into clients ${tx(carteira.slice(i, i + 125).map((cl) => ({
+        id: cl.id, organization_id: orgId, reference: cl.reference, name: cl.name, email: cl.email,
+        phone: cl.phone, nif: cl.nif, city: cl.city, notes: cl.notes, created_at: ha(90 - (cl.n % 80)),
+      })) as never[])}`;
+    }
+    const porEmail = new Map(carteira.filter((cl) => cl.email).map((cl) => [cl.email!, cl.id]));
+
     for (const s of specs) {
-      const [cli] = await tx<{ id: string }[]>`
-        insert into clients (organization_id, name, email, phone, created_at)
-        values (${orgId}, ${s.cliente.nome}, ${s.cliente.email}, ${s.cliente.telefone}, ${ha(s.criado)})
-        returning id`;
+      const cli = { id: porEmail.get(s.cliente.email)! };
       const tipoNome = (await tx<{ name: string }[]>`select name from matter_types where id = ${tipos[s.tipo]}`)[0].name;
       const [m] = await tx<{ id: string; reference: string }[]>`
         insert into matters (organization_id, year, number, client_id, matter_type_id, title, state,
@@ -294,6 +327,21 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
       }
     }
 
+    // Atividade gerada para parte da carteira (os restantes ficam sem processos).
+    const tiposCompletos = await tx<{ id: string; key: string; name: string }[]>`select id, key, name from matter_types order by position`;
+    const reqs = await tx<{ matter_type_id: string; label: string; required: boolean; position: number }[]>`
+      select matter_type_id, label, required, position from document_requirements order by position`;
+    await gerarAtividade(tx, {
+      orgId,
+      utilizadores: [U.marcia, U.joao, U.carolina],
+      tipos: tiposCompletos.map((t) => ({ ...t, requisitos: reqs.filter((r) => r.matter_type_id === t.id) })),
+      ano,
+      ha,
+      dia,
+      pdf: pdfMinimo,
+      sha256,
+    }, carteira.filter((cl) => cl.n >= 15 && cl.n <= 140 && !fixos.some((f) => f.email === cl.email)), 43);
+
     // Caixa de entrada: dois emails por triar.
     const [e1] = await tx<{ id: string }[]>`
       insert into inbox_messages (organization_id, from_name, from_email, subject, body, received_at, created_by)
@@ -322,8 +370,10 @@ async function criarSegundoEscritorio(sql: Sql, palavraPasse: string) {
     const [tipo] = await tx<{ id: string; name: string }[]>`
       select id, name from matter_types where key = 'procuracao'`;
     const [cli] = await tx<{ id: string }[]>`
-      insert into clients (organization_id, name, email) values (${orgId}, 'Diogo Barreto', 'diogo.barreto@example.pt')
+      insert into clients (organization_id, reference, name, email)
+      values (${orgId}, 'CLI-0001', 'Diogo Barreto', 'diogo.barreto@example.pt')
       returning id`;
+    await tx`update organizations set settings = settings || '{"demo": true}'::jsonb where id = ${orgId}`;
     const [m] = await tx<{ id: string }[]>`
       insert into matters (organization_id, year, number, client_id, matter_type_id, title, state,
                            state_since, responsible_id)
@@ -346,3 +396,36 @@ export async function criarDadosDemo(sql: Sql, palavraPasse: string): Promise<vo
   await criarSegundoEscritorio(sql, palavraPasse);
 }
 
+
+export const SLUGS_DEMO = ["demo", "norte"] as const;
+
+/**
+ * Prepara (ou volta a preparar) os escritórios de demonstração. Apaga apenas
+ * escritórios marcados como demonstração (settings.demo = true); recusa tocar
+ * num escritório real com o mesmo endereço. Repetir mantém 250 clientes.
+ */
+export async function prepararDemo(sql: Sql, palavraPasse: string): Promise<void> {
+  // Valida TODOS antes de apagar qualquer um: nada é alterado se algum for real.
+  const existentes = await sql<{ id: string; slug: string; demo: boolean }[]>`
+    select id, slug, coalesce((settings->>'demo')::boolean, false) as demo
+    from organizations where slug = any(${[...SLUGS_DEMO]}::text[])`;
+  const real = existentes.find((o) => !o.demo);
+  if (real) throw new Error(`O escritório «${real.slug}» não é de demonstração. Nada foi alterado.`);
+  for (const org of existentes) {
+    await sql.begin(async (tx) => {
+      await tx`select set_config('app.purge_org', ${org.id}, true)`;
+      await tx`select set_config('app.org_id', ${org.id}, true)`;
+      // Ordem explícita (filhos primeiro), sempre restrita a este escritório.
+      for (const tabela of [
+        "events", "tasks", "deadlines", "send_attempts", "outbound_messages", "client_requests",
+        "user_positions", "attachment_blobs", "attachments", "matter_items", "matters",
+        "inbox_messages", "clients", "document_requirements", "matter_types", "message_templates",
+        "sessions", "users",
+      ]) {
+        await tx`delete from ${tx(tabela)} where organization_id = ${org.id}`;
+      }
+      await tx`delete from organizations where id = ${org.id}`;
+    });
+  }
+  await criarDadosDemo(sql, palavraPasse);
+}

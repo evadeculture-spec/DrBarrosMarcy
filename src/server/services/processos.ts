@@ -7,6 +7,10 @@ import { diaLisboa } from "../domain/datas";
 import { acoesManuais, isEstado, type Estado } from "../domain/estados";
 import { calcularFaixa, contarItens, type EstadoItem, type Faixa } from "../domain/faixa";
 import type { Papel } from "../domain/papeis";
+import { criarClienteTx, normalizar } from "./clientes";
+import { MOTIVOS_BLOQUEIO, MOTIVOS_MANUAIS, SQL_BLOQUEIO, type MotivoBloqueio } from "./indicadores";
+import type { Tarefa } from "./tarefas";
+import { fecharRevisaoSeConcluida, garantirRevisao } from "./tarefas";
 import {
   bloquearProcesso,
   ErroNegocio,
@@ -19,8 +23,8 @@ import {
 
 export const ESTADO_ITEM_ROTULO: Record<EstadoItem, string> = {
   em_falta: "Em falta",
-  recebido: "Recebido",
-  conferido: "Conferido",
+  recebido: "Recebido para revisão",
+  conferido: "Validado",
   rejeitado: "Rejeitado",
 };
 
@@ -57,11 +61,13 @@ export interface ClienteResumo {
   id: string;
   name: string;
   email: string | null;
+  reference: string;
+  city: string | null;
 }
 
 export async function listarClientes(ctx: Ctx): Promise<ClienteResumo[]> {
   return withTenant(ctx, (tx) => tx<ClienteResumo[]>`
-    select id, name, email from clients order by name`);
+    select id, name, email, reference, city from clients order by name, reference, id`);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +88,7 @@ export const NovoProcessoSchema = z
     tipoId: z.string().uuid("Escolha o tipo de processo."),
     titulo: z.string().trim().max(200).optional(),
     responsavelId: z.string().uuid("Escolha o responsável."),
+    estadoInicial: z.enum(["por_triar", "em_conferencia"]).optional(),
     seguimento: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -101,9 +108,10 @@ export async function criarProcessoTx(
   tx: Tx,
   ctx: Ctx,
   bruto: NovoProcesso,
-  estadoInicial: Estado = "por_triar",
+  estadoPorOmissao: Estado = "por_triar",
 ): Promise<{ id: string; reference: string }> {
   const input = NovoProcessoSchema.parse(bruto);
+  const estadoInicial: Estado = input.estadoInicial ?? estadoPorOmissao;
 
   let clienteId = input.clienteId ?? null;
   let clienteNome: string;
@@ -113,10 +121,7 @@ export async function criarProcessoTx(
     clienteNome = c.name;
   } else {
     const n = input.novoCliente!;
-    const [c] = await tx<{ id: string }[]>`
-      insert into clients (organization_id, name, email, phone)
-      values (${ctx.orgId}, ${n.nome}, ${n.email || null}, ${n.telefone || null})
-      returning id`;
+    const c = await criarClienteTx(tx, ctx, { nome: n.nome, email: n.email, telefone: n.telefone });
     clienteId = c.id;
     clienteNome = n.nome;
   }
@@ -187,7 +192,7 @@ export async function listarProcessos(
   const resp = filtros.responsavel && /^[0-9a-f-]{36}$/.test(filtros.responsavel)
     ? filtros.responsavel
     : null;
-  const q = filtros.q?.trim() ? `%${filtros.q.trim().toLowerCase()}%` : null;
+  const q = filtros.q?.trim() ? `%${normalizar(filtros.q.trim()).replace(/[%_\\]/g, (c) => `\\${c}`)}%` : null;
   const incluirConcluidos = filtros.incluirConcluidos || estado === "concluido";
 
   return withTenant(ctx, (tx) => tx<LinhaProcesso[]>`
@@ -205,8 +210,8 @@ export async function listarProcessos(
       and (${resp}::uuid is null or m.responsible_id = ${resp})
       and (${incluirConcluidos} or m.state <> 'concluido')
       and (${q}::text is null
-           or lower(m.reference) like ${q} or lower(m.title) like ${q}
-           or lower(c.name) like ${q})
+           or sf_normalizar(m.reference || ' ' || m.title) like ${q}
+           or c.pesquisa like ${q})
     group by m.id, c.name, u.name, t.name
     order by m.state_since asc
     limit 500`);
@@ -277,6 +282,12 @@ export interface Ficha {
     state_since: string;
     follow_up_on: string | null;
     created_at: string;
+    valor_previsto: string | null;
+    valor_pago: string;
+    bloqueio_motivo: string | null;
+    bloqueio_nota: string | null;
+    bloqueio_revisao: string | null;
+    proxima_acao: string | null;
     responsible_id: string;
     responsible_name: string;
     type_name: string;
@@ -291,6 +302,9 @@ export interface Ficha {
   acoes: { para: Estado; rotulo: string }[];
   podeCompletar: boolean;
   posicao: string | null;
+  tarefas: Tarefa[];
+  ultimaDecisao: EventoFicha | null;
+  bloqueioDerivado: boolean;
 }
 
 export async function obterFicha(ctx: Ctx, matterId: string): Promise<Ficha | null> {
@@ -299,6 +313,8 @@ export async function obterFicha(ctx: Ctx, matterId: string): Promise<Ficha | nu
     const [m] = await tx`
       select m.id, m.reference, m.title, m.state, m.state_since, m.follow_up_on,
              m.created_at, m.responsible_id, u.name as responsible_name,
+             m.valor_previsto, m.valor_pago, m.bloqueio_motivo, m.bloqueio_nota, m.bloqueio_revisao,
+             m.proxima_acao,
              t.name as type_name,
              c.id as client_id, c.name as client_name, c.email as client_email,
              c.phone as client_phone
@@ -330,6 +346,15 @@ export async function obterFicha(ctx: Ctx, matterId: string): Promise<Ficha | nu
       select e.id, e.kind, e.summary, e.data, e.created_at, u.name as actor_name
       from events e left join users u on u.id = e.actor_id
       where e.matter_id = ${matterId} order by e.created_at desc, e.id`;
+    const tarefas = await tx<Tarefa[]>`
+      select t.id, t.matter_id, null as matter_reference, null as client_name, t.kind, t.title,
+             t.assignee_id, u.name as assignee_name, t.due_on, t.status, t.completed_at,
+             uc.name as completed_by_name, t.created_at
+      from tasks t join users u on u.id = t.assignee_id left join users uc on uc.id = t.completed_by
+      where t.matter_id = ${matterId}
+      order by t.status, t.due_on nulls last, t.created_at`;
+    const [{ derivado }] = await tx<{ derivado: boolean }[]>`
+      select (${tx.unsafe(SQL_BLOQUEIO)}) as derivado from matters m where m.id = ${matterId}`;
     const [pos] = await tx<{ tab: string }[]>`
       select tab from user_positions where user_id = ${ctx.userId} and matter_id = ${matterId}`;
 
@@ -344,6 +369,12 @@ export async function obterFicha(ctx: Ctx, matterId: string): Promise<Ficha | nu
         state_since: m.state_since,
         follow_up_on: m.follow_up_on,
         created_at: m.created_at,
+        valor_previsto: m.valor_previsto,
+        valor_pago: m.valor_pago,
+        bloqueio_motivo: m.bloqueio_motivo,
+        bloqueio_nota: m.bloqueio_nota,
+        bloqueio_revisao: m.bloqueio_revisao,
+        proxima_acao: m.proxima_acao,
         responsible_id: m.responsible_id,
         responsible_name: m.responsible_name,
         type_name: m.type_name,
@@ -369,6 +400,9 @@ export async function obterFicha(ctx: Ctx, matterId: string): Promise<Ficha | nu
       acoes: acoesManuais(estado, ctx.papel),
       podeCompletar: contagem.falta === 0 && contagem.porConferir === 0,
       posicao: pos?.tab ?? null,
+      tarefas: [...tarefas],
+      ultimaDecisao: eventos.find((e) => KINDS_DECISAO.includes(e.kind)) ?? null,
+      bloqueioDerivado: derivado && !m.bloqueio_motivo,
     };
   });
 }
@@ -388,7 +422,7 @@ export async function transicionar(ctx: Ctx, matterId: string, para: string) {
       const c = contarItens(itens);
       if (c.falta > 0 || c.porConferir > 0) {
         throw new ErroNegocio(
-          "Só pode marcar como completo quando todos os documentos obrigatórios estiverem conferidos.",
+          "Só pode marcar como completo quando todos os documentos obrigatórios estiverem validados.",
           "transicao",
         );
       }
@@ -425,8 +459,10 @@ export async function alterarItemTx(
     data: { itemId, de: item.status, para: status },
   });
   if (m.state === "completo" && item.required && status !== "conferido") {
-    await mudarEstadoSistema(tx, ctx, m, "em_conferencia", "documento deixou de estar conferido");
+    await mudarEstadoSistema(tx, ctx, m, "em_conferencia", "documento deixou de estar validado");
   }
+  if (status === "recebido") await garantirRevisao(tx, ctx, m.id, "documento recebido");
+  else await fecharRevisaoSeConcluida(tx, ctx, m.id);
   return { anterior: item.status, matterId: m.id };
 }
 
@@ -512,7 +548,73 @@ export async function atribuirResponsavel(ctx: Ctx, matterId: string, userId: st
   });
 }
 
-export const SEPARADORES = ["documentos", "pedido", "prazos", "historico"] as const;
+export const SEPARADORES = ["documentos", "tarefas", "prazos", "pedido", "pagamento", "historico"] as const;
+
+/** Eventos que representam decisões humanas (mostrados como «última decisão»). */
+const KINDS_DECISAO = [
+  "estado", "item", "anexo_associado", "anexo_movido", "anulado", "pedido_enviado", "pedido_devolvido",
+  "pedido_cancelado", "pedido_submetido", "responsavel", "bloqueio", "tarefa", "prazo", "proxima_acao",
+];
+
+export async function definirProximaAcao(ctx: Ctx, matterId: string, texto: string | null) {
+  exigirUuid(matterId, "Processo");
+  const t = texto?.trim() ? texto.trim().slice(0, 300) : null;
+  await withTenant(ctx, async (tx) => {
+    const [m] = await tx<{ proxima_acao: string | null }[]>`select proxima_acao from matters where id = ${matterId} for update`;
+    if (!m) throw new ErroNegocio("Processo não encontrado.", "nao_encontrado");
+    if (m.proxima_acao === t) return;
+    await tx`update matters set proxima_acao = ${t}, updated_at = now() where id = ${matterId}`;
+    await registarEvento(tx, ctx, {
+      matterId, kind: "proxima_acao",
+      summary: t ? `Próxima ação definida: «${t}».` : "Próxima ação manual removida (volta a ser a sugerida pelo estado).",
+    });
+  });
+}
+
+export async function definirBloqueio(
+  ctx: Ctx,
+  matterId: string,
+  b: { motivo: string; nota?: string | null; revisao: string } | null,
+) {
+  exigirUuid(matterId, "Processo");
+  if (b) {
+    if (!(MOTIVOS_MANUAIS as readonly string[]).includes(b.motivo)) throw new ErroNegocio("Escolha o motivo do bloqueio.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(b.revisao)) throw new ErroNegocio("Indique a data da próxima revisão.");
+  }
+  await withTenant(ctx, async (tx) => {
+    const [m] = await tx<{ bloqueio_motivo: string | null }[]>`select bloqueio_motivo from matters where id = ${matterId} for update`;
+    if (!m) throw new ErroNegocio("Processo não encontrado.", "nao_encontrado");
+    await tx`
+      update matters set bloqueio_motivo = ${b?.motivo ?? null}, bloqueio_nota = ${b?.nota?.trim() || null},
+             bloqueio_revisao = ${b?.revisao ?? null}, updated_at = now()
+      where id = ${matterId}`;
+    await registarEvento(tx, ctx, {
+      matterId, kind: "bloqueio",
+      summary: b
+        ? `Processo parado: ${MOTIVOS_BLOQUEIO[b.motivo as MotivoBloqueio]}${b.nota?.trim() ? ` — ${b.nota.trim()}` : ""}. Revisão a ${b.revisao.split("-").reverse().join("/")}.`
+        : "Bloqueio levantado.",
+      data: { de: m.bloqueio_motivo, para: b?.motivo ?? null },
+    });
+  });
+}
+
+export async function definirValores(ctx: Ctx, matterId: string, previsto: number | null, pago: number) {
+  exigirUuid(matterId, "Processo");
+  const ok = (v: number) => Number.isFinite(v) && v >= 0 && v < 10_000_000;
+  if ((previsto !== null && !ok(previsto)) || !ok(pago)) throw new ErroNegocio("Valores inválidos.");
+  await withTenant(ctx, async (tx) => {
+    const [m] = await tx<{ valor_previsto: string | null; valor_pago: string }[]>`
+      select valor_previsto, valor_pago from matters where id = ${matterId} for update`;
+    if (!m) throw new ErroNegocio("Processo não encontrado.", "nao_encontrado");
+    await tx`update matters set valor_previsto = ${previsto}, valor_pago = ${pago}, updated_at = now() where id = ${matterId}`;
+    const eur = (v: number | null) => (v === null ? "—" : new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v));
+    await registarEvento(tx, ctx, {
+      matterId, kind: "pagamento",
+      summary: `Valores atualizados: previsto ${eur(previsto)}, pago ${eur(pago)}.`,
+      data: { antes: m, depois: { previsto, pago } },
+    });
+  });
+}
 
 export async function guardarPosicao(ctx: Ctx, matterId: string, tab: string) {
   if (!(SEPARADORES as readonly string[]).includes(tab)) return;

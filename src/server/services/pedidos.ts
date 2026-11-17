@@ -311,3 +311,41 @@ export async function simularFalhasEnvio(ctx: Ctx, n: number) {
       where id = ${ctx.orgId}`;
   });
 }
+
+/**
+ * Regista um envio feito fora da aplicação (ex.: o texto foi copiado para o
+ * email do escritório). Idempotente: um pedido já enviado não é registado
+ * outra vez. Só um solicitador ou administrador o pode registar.
+ */
+export async function registarEnvioExterno(ctx: Ctx, pedidoId: string, nota?: string | null) {
+  exigirUuid(pedidoId, "Pedido");
+  exigir(ctx, "aprovar_pedido");
+  return withTenant(ctx, async (tx) => {
+    const p = await bloquearPedido(tx, pedidoId);
+    if (p.status === "enviado") return { jaEnviado: true };
+    if (p.status === "rascunho") await submeterTx(tx, ctx, p);
+    if (p.status !== "a_aguardar_aprovacao" && p.status !== "falhado") {
+      throw new ErroNegocio(`Este pedido está «${ESTADO_PEDIDO_ROTULO[p.status]}» e não pode ser registado como enviado.`);
+    }
+    validarConteudo(p);
+    const m = await bloquearProcesso(tx, p.matter_id);
+    await tx`
+      update client_requests set approved_by = coalesce(approved_by, ${ctx.userId}),
+             approved_at = coalesce(approved_at, now()), status = 'enviado', sent_at = now(),
+             last_error = null, updated_at = now()
+      where id = ${p.id}`;
+    await tx`
+      insert into outbound_messages (organization_id, request_id, to_email, subject, body, via)
+      values (${ctx.orgId}, ${p.id}, ${p.to_email}, ${p.subject}, ${p.body}, 'externo')`;
+    const seguimento = somarDias(diaLisboa(), DIAS_SEGUIMENTO);
+    await tx`update matters set follow_up_on = ${seguimento} where id = ${p.matter_id}`;
+    await mudarEstadoSistema(tx, ctx, m, "a_aguardar_cliente", "envio registado manualmente");
+    await registarEvento(tx, ctx, {
+      matterId: p.matter_id,
+      kind: "pedido_enviado",
+      summary: `Envio externo registado à mão para ${p.to_email}${nota?.trim() ? ` (${nota.trim().slice(0, 200)})` : ""}. Seguimento a ${seguimento.split("-").reverse().join("/")}.`,
+      data: { pedidoId: p.id, via: "externo", seguimento },
+    });
+    return { jaEnviado: false };
+  });
+}
