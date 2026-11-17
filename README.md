@@ -6,7 +6,8 @@ Aplicação web para escritórios de solicitadoria, centrada num percurso:
 receber documentos → conferir → pedir o que falta → retomar quando o cliente
 responde.
 
-- **Hoje** — lista de ações da equipa (não contadores). Um processo aparece
+- **Dashboard** — sete cartões (cada um abre a lista com o mesmo filtro),
+  Prioridades de hoje e Processos parados por motivo. A vista «Hoje» vive aqui: Um processo aparece
   quando a equipa tem de agir, desaparece quando a bola passa ao cliente e
   volta com a resposta ou na data de seguimento.
 - **Ficha do processo** — faixa fixa «Falta: N documentos · Aguarda: quem
@@ -18,6 +19,41 @@ responde.
   solicitador, envio idempotente (reenviar nunca duplica).
 - **Vários escritórios** — um por subdomínio, isolados na base de dados
   (Row Level Security), ativados só por configuração.
+
+## Demonstração com 250 clientes
+
+```bash
+# .env.local com DEMO_SEED=1 e SEED_DEMO_PASSWORD (ver .env.example)
+npm run demo:preparar
+```
+
+Cria (ou recria) o escritório de demonstração «demo» com **exatamente 250
+clientes fictícios** (referências estáveis CLI-0001…CLI-0250, homónimos,
+nomes acentuados, clientes com vários processos e sem processos) e o
+escritório «norte» para testar o isolamento. Tarefas, prazos, bloqueios e
+pagamentos são coerentes e as datas são relativas ao dia da preparação
+(Europe/Lisbon). Repetir o comando mantém 250 clientes. Recusa correr sem
+`DEMO_SEED=1`, com `NODE_ENV=production` ou sobre um escritório que não esteja
+marcado como demonstração.
+
+### Experimentar o percurso em cinco minutos
+
+1. Entrar → «Entrada rápida» → **Márcia Raposo** (Solicitadora).
+2. **Dashboard**: os sete cartões abrem a lista que explica cada número.
+3. Pesquisa no topo: escrever `ines` → duas «Inês Faria» (homónimas,
+   distinguidas por referência, localidade e NIF) → abrir a de Castelo Branco.
+4. Na ficha do cliente: **Novo processo para este cliente** (cliente já
+   escolhido) → tipo «Habilitação de herdeiros» → Criar.
+5. Na ficha do processo: **Simular resposta do cliente (3 anexos)** → em
+   Receção, confirmar as sugestões; o anexo que é de outro processo está
+   identificado. Associar, pré-visualizar, e corrigir enganos com «Mover» na
+   ficha (fica no histórico dos dois processos).
+6. Separador **Tarefas**: há uma única tarefa de revisão. Validar os
+   documentos em **Documentos** fecha-a; nova documentação reabre a mesma.
+7. **Pedido ao cliente** → Preparar → Copiar texto → (opcional) Registar envio
+   externo. Copiar não marca como enviado.
+8. Mudar o **Responsável** para Carolina Folgado e recarregar: próxima ação,
+   responsável e última decisão mantêm-se.
 
 ## Stack
 

@@ -12,6 +12,43 @@ demo está no fim deste ficheiro._
   (aprovação, envio, reenvio) → Hoje → resposta → conclusão.
 - Os 7 critérios de aceitação têm testes automáticos, todos a passar.
 
+## Fase «escritório com 250 clientes» (17/11/2026)
+
+Implementado sobre o produto existente (as fases 0–5 continuam válidas):
+
+- **Navegação da referência**: Dashboard, Processos, Clientes, Tarefas,
+  Documentos em falta, Templates, Importar, Configurações; escritório no
+  rodapé; pesquisa no topo (⌘K/Ctrl+K ou «/»); sino com notificações reais
+  (tarefas, prazos, documentos por associar, pedidos por aprovar).
+- **Dashboard**: os 7 cartões; contador e lista vêm da mesma função
+  (`src/server/services/indicadores.ts`); Prioridades de hoje com prazos
+  confirmados primeiro e lembretes internos identificados; processos parados
+  agrupados por motivo, com responsável e próxima revisão.
+- **Clientes**: pesquisa sem acentos e por várias palavras, paginação estável
+  (25/página), ficha com contactos, processos e próxima ação, criar/editar,
+  regresso à lista com a mesma pesquisa e página.
+- **Processos**: estado inicial, referência automática, lista documental do
+  modelo; ficha com próxima ação / quem / quando e última decisão no primeiro
+  ecrã; separadores Documentos, Tarefas, Prazos, Pedido, Pagamento, Histórico;
+  bloqueio explícito (motivo, nota, revisão); valores previsto/pago.
+- **Receção**: carregamento manual com origem, pré-visualização (PDF/imagens),
+  sugestões heurísticas (sem IA) que a pessoa confirma; correção com rasto.
+- **Revisão única por processo**: criada ou reaberta quando chega
+  documentação, fechada quando já nada está «recebido para revisão».
+- **Pedido**: copiar texto e registar envio externo (idempotente).
+- **Importar**: CSV de clientes com exemplo, pré-visualização, validação por
+  linha e sem duplicados ao repetir.
+- **Demonstração**: `npm run demo:preparar` (250 clientes, ver README).
+
+Testes executados: lint, typecheck, `npm test` (58, Postgres real),
+`npm run build`, `npm run test:e2e` (19, Chromium + axe, incluindo o percurso
+completo e o dashboard em iPad horizontal, desktop e telemóvel).
+
+Limitações observadas: notificações calculadas a cada pedido (sem «lidas»);
+sugestões de associação são heurísticas pelo nome do ficheiro; envio de email
+continua simulado; anexos acima de ~6 MB falham no Netlify; a lista de
+clientes no «Novo processo» mostra até 60 resultados por filtro.
+
 ## Verificação (16/11/2026)
 
 | Verificação | Resultado |
