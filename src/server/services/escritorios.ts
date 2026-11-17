@@ -2,9 +2,8 @@
  * Ativar um escritório só com configuração (sem alterar código).
  * Usado por `npm run escritorio:ativar` e pelo seed de demonstração.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { z } from "zod";
+import exemplos from "../../../config/listas-documentais.exemplo.json";
 import { withTenant, type Sql } from "../db";
 import { hashPalavraPasse, MIN_PALAVRA_PASSE } from "./auth";
 
@@ -41,11 +40,9 @@ export function exemplosPorOmissao(): {
   tiposDeProcesso: z.infer<typeof TipoSchema>[];
   modelos: z.infer<typeof ModeloSchema>[];
 } {
-  const ficheiro = path.join(process.cwd(), "config", "listas-documentais.exemplo.json");
-  const json = JSON.parse(readFileSync(ficheiro, "utf8"));
   return {
-    tiposDeProcesso: z.array(TipoSchema).parse(json.tiposDeProcesso),
-    modelos: z.array(ModeloSchema).parse(json.modelos),
+    tiposDeProcesso: z.array(TipoSchema).parse(exemplos.tiposDeProcesso),
+    modelos: z.array(ModeloSchema).parse(exemplos.modelos),
   };
 }
 

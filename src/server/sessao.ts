@@ -4,6 +4,7 @@
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { garantirBaseDeDados } from "./arranque";
 import { escritorioPorSlug, utilizadorDaSessao, type Escritorio, type Utilizador } from "./services/auth";
 import type { Ctx } from "./services/comum";
 
@@ -12,6 +13,7 @@ export const COOKIE_SESSAO = "sf_sessao";
 export const escritorioAtual = cache(async (): Promise<Escritorio | null> => {
   const slug = headers().get("x-sf-escritorio");
   if (!slug) return null;
+  await garantirBaseDeDados();
   return escritorioPorSlug(slug);
 });
 

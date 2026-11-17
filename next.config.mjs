@@ -6,6 +6,8 @@ const nextConfig = {
     // Anexos até 15 MB por ficheiro, 25 MB por envio (validado no servidor).
     serverActions: { bodySizeLimit: "30mb" },
     serverComponentsExternalPackages: ["postgres"],
+    // As migrações são lidas do disco no arranque (AUTO_MIGRAR).
+    outputFileTracingIncludes: { "/**": ["./db/migrations/**"] },
   },
 };
 
