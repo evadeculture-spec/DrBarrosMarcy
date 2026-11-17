@@ -8,7 +8,7 @@ const ECRAS = ["/hoje", "/triagem", "/processos", "/processos/novo", "/modelos",
 for (const largura of [1280, 768, 375]) {
   test(`sem violações WCAG AA a ${largura}px`, async ({ page }) => {
     await page.setViewportSize({ width: largura, height: 900 });
-    await entrar(page, "marcia@demo.example.pt");
+    await entrar(page, "joao@demo.example.pt");
     const urls = [...ECRAS];
     await page.goto("/processos?q=Rui");
     await page.getByRole("link", { name: /Rui Fonseca/ }).click();

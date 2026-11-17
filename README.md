@@ -51,9 +51,9 @@ npm run dev
 ```
 
 Abra **http://demo.localhost:3000** (ou `http://localhost:3000`, que usa
-`DEFAULT_ORG_SLUG`). Contas de demonstração: `marcia@` (Márcia Raposo,
-administradora), `joao@` (João Barros, solicitador) e `carolina@demo.example.pt`
-(Carolina Folgado, triagem), com a
+`DEFAULT_ORG_SLUG`). Contas de demonstração: `joao@` (João Barros,
+administrador), `marcia@` (Márcia Raposo, solicitadora) e
+`carolina@demo.example.pt` (Carolina Folgado, solicitadora), com a
 palavra-passe definida em `SEED_DEMO_PASSWORD`. O segundo escritório de
 demonstração está em **http://norte.localhost:3000** (`paulo@norte.example.pt`).
 
@@ -124,7 +124,9 @@ ligação do Netlify é a do dono da BD; com `DATABASE_SET_ROLE` cada transaçã
 assume um papel restrito, sujeito a RLS. Variáveis do projeto: `AUTO_MIGRAR=1`
 (aplica migrações no primeiro acesso), `DATABASE_SET_ROLE=sf_app`,
 `DEFAULT_ORG_SLUG=demo`, `DEMO_SEED=1` + `SEED_DEMO_PASSWORD` (cria a
-demonstração se a BD estiver vazia), `DEMO_MOSTRAR_CONTAS=1`.
+demonstração se a BD estiver vazia), `DEMO_ENTRADA_RAPIDA=1` (barra de entrada
+num clique, sem palavra-passe, só no escritório «demo» e só para as três contas
+de demonstração — nunca ativar numa instalação real).
 O adaptador `@netlify/plugin-nextjs` está declarado em `netlify.toml`.
 
 ### Outros alojamentos

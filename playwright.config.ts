@@ -25,7 +25,7 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 60_000,
     env: Object.fromEntries(
-      Object.entries({ ...process.env, DEFAULT_ORG_SLUG: "demo", ENVIO_MODO: "registo" }).filter(
+      Object.entries({ ...process.env, DEFAULT_ORG_SLUG: "demo", ENVIO_MODO: "registo", DEMO_ENTRADA_RAPIDA: "1" }).filter(
         (e): e is [string, string] => typeof e[1] === "string",
       ),
     ),

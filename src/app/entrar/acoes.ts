@@ -2,7 +2,8 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { entrar, sair, SESSAO_DIAS } from "@/server/services/auth";
+import { CONTAS_DEMO, entradaRapidaAtiva } from "@/server/contas-demo";
+import { entrar, entrarDemonstracao, sair, SESSAO_DIAS } from "@/server/services/auth";
 import { COOKIE_SESSAO, escritorioAtual } from "@/server/sessao";
 
 export interface EstadoEntrar {
@@ -33,6 +34,11 @@ export async function entrarAcao(_: EstadoEntrar, form: FormData): Promise<Estad
     return { erro: "Email ou palavra-passe incorretos.", email };
   }
   tentativas.delete(chave);
+  guardarSessao(token);
+  redirect("/hoje");
+}
+
+function guardarSessao(token: string) {
   const seguro = (headers().get("x-forwarded-proto") ?? "").includes("https") || process.env.NODE_ENV === "production";
   cookies().set(COOKIE_SESSAO, token, {
     httpOnly: true,
@@ -41,6 +47,18 @@ export async function entrarAcao(_: EstadoEntrar, form: FormData): Promise<Estad
     path: "/",
     maxAge: SESSAO_DIAS * 86_400,
   });
+}
+
+/** Entrada rápida da demonstração (sem palavra-passe). Validada aqui, no servidor. */
+export async function entrarDemoAcao(email: string): Promise<EstadoEntrar> {
+  const escritorio = await escritorioAtual();
+  if (!escritorio || !entradaRapidaAtiva(escritorio.slug)) {
+    return { erro: "A entrada rápida só existe na demonstração." };
+  }
+  if (!CONTAS_DEMO.some((c) => c.email === email)) return { erro: "Conta de demonstração desconhecida." };
+  const token = await entrarDemonstracao(escritorio.id, email);
+  if (!token) return { erro: "Esta conta de demonstração não está disponível." };
+  guardarSessao(token);
   redirect("/hoje");
 }
 

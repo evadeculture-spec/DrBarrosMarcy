@@ -4,7 +4,7 @@
  */
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { db, withTenant } from "../db";
+import { db, withTenant, type Tx } from "../db";
 import type { Papel } from "../domain/papeis";
 
 const scryptAsync = promisify(scrypt) as (
@@ -79,14 +79,30 @@ export async function entrar(
       return null;
     }
     if (!(await verificarPalavraPasse(palavraPasse, u.password_hash))) return null;
+    return criarSessao(tx, orgId, u.id);
+  });
+}
 
-    const token = randomBytes(32).toString("base64url");
-    await tx`
-      insert into sessions (token_hash, organization_id, user_id, expires_at)
-      values (${hashToken(token)}, ${orgId}, ${u.id},
-              now() + make_interval(days => ${SESSAO_DIAS}))`;
-    await tx`delete from sessions where user_id = ${u.id} and expires_at < now()`;
-    return token;
+async function criarSessao(tx: Tx, orgId: string, userId: string): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await tx`
+    insert into sessions (token_hash, organization_id, user_id, expires_at)
+    values (${hashToken(token)}, ${orgId}, ${userId},
+            now() + make_interval(days => ${SESSAO_DIAS}))`;
+  await tx`delete from sessions where user_id = ${userId} and expires_at < now()`;
+  return token;
+}
+
+/**
+ * Entrada sem palavra-passe, SÓ para a instalação de demonstração.
+ * Quem chama tem de verificar que o modo demonstração está ativo e que o
+ * email pertence à lista fixa de contas de demonstração.
+ */
+export async function entrarDemonstracao(orgId: string, email: string): Promise<string | null> {
+  return withTenant({ orgId }, async (tx) => {
+    const [u] = await tx<{ id: string }[]>`
+      select id from users where email = ${email.toLowerCase()} and active`;
+    return u ? criarSessao(tx, orgId, u.id) : null;
   });
 }
 

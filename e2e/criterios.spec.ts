@@ -24,7 +24,7 @@ test("critério 1: processo à espera do cliente diz que é o cliente quem age",
 
 test("critério 5: o escritório Norte não acede a nada do Demo", async ({ page, browser }) => {
   // Recolher ids reais do escritório Demo.
-  await entrar(page, "marcia@demo.example.pt");
+  await entrar(page, "joao@demo.example.pt");
   await page.getByRole("link", { name: /Rui Fonseca/ }).first().click();
   await page.waitForURL(/\/processos\/[0-9a-f-]{36}/);
   const urlProcesso = new URL(page.url()).pathname;
@@ -39,9 +39,9 @@ test("critério 5: o escritório Norte não acede a nada do Demo", async ({ page
   await p2.goto(`${NORTE}/hoje`);
   await expect(p2).toHaveURL(/\/entrar$/);
   // As credenciais do Demo também não.
-  await p2.getByLabel("Email").fill("marcia@demo.example.pt");
+  await p2.getByLabel("Email").fill("joao@demo.example.pt");
   await p2.getByLabel("Palavra-passe").fill(process.env.SEED_DEMO_PASSWORD!);
-  await p2.getByRole("button", { name: "Entrar" }).click();
+  await p2.getByRole("button", { name: "Entrar", exact: true }).click();
   await expect(p2.getByText("Email ou palavra-passe incorretos.")).toBeVisible();
 
   await entrar(p2, "paulo@norte.example.pt", NORTE);
@@ -61,7 +61,7 @@ test("critério 5: o escritório Norte não acede a nada do Demo", async ({ page
 });
 
 test("sem sessão não se descarrega nenhum anexo", async ({ page, browser }) => {
-  await entrar(page, "marcia@demo.example.pt");
+  await entrar(page, "joao@demo.example.pt");
   await page.getByRole("link", { name: /Rui Fonseca/ }).first().click();
   const href = await page.locator('a[href^="/api/anexos/"]').first().getAttribute("href");
   const anonimo = await browser.newContext();

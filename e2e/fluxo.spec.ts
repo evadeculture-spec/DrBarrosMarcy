@@ -15,7 +15,7 @@ test("triagem: associar um anexo com sugestão e anular", async ({ page }) => {
 });
 
 test("pedido: falha simulada, reenvio, a bola passa ao cliente e sai de Hoje", async ({ page }) => {
-  await entrar(page, "marcia@demo.example.pt");
+  await entrar(page, "joao@demo.example.pt");
   await page.goto("/configuracoes");
   await page.getByRole("button", { name: "Simular falha no próximo envio" }).click();
   await expect(page.getByText("O próximo envio vai falhar.")).toBeVisible();
@@ -38,7 +38,7 @@ test("pedido: falha simulada, reenvio, a bola passa ao cliente e sai de Hoje", a
 });
 
 test("retoma: reabrir o processo volta ao separador onde se estava", async ({ page }) => {
-  await entrar(page, "joao@demo.example.pt");
+  await entrar(page, "marcia@demo.example.pt");
   await page.goto("/processos?q=Fernando");
   await page.getByRole("link", { name: /Fernando Batista/ }).click();
   await page.getByRole("tab", { name: "Prazos e seguimento" }).click();
@@ -50,7 +50,7 @@ test("retoma: reabrir o processo volta ao separador onde se estava", async ({ pa
 });
 
 test("teclado: saltar para o conteúdo e navegar nos separadores com setas", async ({ page }) => {
-  await entrar(page, "joao@demo.example.pt");
+  await entrar(page, "marcia@demo.example.pt");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Saltar para o conteúdo" })).toBeFocused();
   await page.goto("/processos?q=Rui");
@@ -61,14 +61,15 @@ test("teclado: saltar para o conteúdo e navegar nos separadores com setas", asy
   await expect(page.getByRole("tab", { name: "Pedido ao cliente" })).toHaveAttribute("aria-selected", "true");
 });
 
-test("triagem não pode concluir; prazo por confirmar sem botão de confirmar", async ({ page }) => {
-  await entrar(page, "carolina@demo.example.pt");
-  await page.goto("/processos?q=Fernando");
-  await page.getByRole("link", { name: /Fernando Batista/ }).click();
-  await expect(page.getByRole("button", { name: "Concluir processo" })).toHaveCount(0);
-  await page.goto("/processos?q=Beatriz");
-  await page.getByRole("link", { name: /Beatriz Carvalho/ }).click();
-  await page.getByRole("tab", { name: "Prazos e seguimento" }).click();
-  await expect(page.getByText("Por confirmar", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Confirmar prazo" })).toHaveCount(0);
+test("entrada rápida da demonstração: um clique, sem palavra-passe", async ({ page }) => {
+  await page.goto("/entrar");
+  await page.getByRole("button", { name: /João Barros/ }).click();
+  await expect(page).toHaveURL(/\/hoje$/);
+  await expect(page.getByText("João Barros")).toBeVisible();
+  await expect(page.getByText(/Administrador ·/)).toBeVisible();
+});
+
+test("entrada rápida não existe fora do escritório de demonstração", async ({ page }) => {
+  await page.goto("http://norte.localhost:3100/entrar");
+  await expect(page.getByText("Entrada rápida")).toHaveCount(0);
 });

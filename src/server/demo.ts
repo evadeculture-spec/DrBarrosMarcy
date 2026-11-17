@@ -85,18 +85,18 @@ async function criarDemo(sql: Sql, palavraPasse: string) {
   const { orgId, adminId } = await ativarEscritorio(sql, {
     slug: "demo",
     nome: "Solicitadoria Exemplo (demonstração)",
-    administrador: { nome: "Márcia Raposo", email: "marcia@demo.example.pt" },
+    administrador: { nome: "João Barros", email: "joao@demo.example.pt" },
   }, palavraPasse);
 
   await withTenant({ orgId }, async (tx) => {
     const hash = await hashPalavraPasse(palavraPasse);
-    const [joao] = await tx<{ id: string }[]>`
+    const [marcia] = await tx<{ id: string }[]>`
       insert into users (organization_id, email, name, role, password_hash)
-      values (${orgId}, 'joao@demo.example.pt', 'João Barros', 'solicitador', ${hash}) returning id`;
+      values (${orgId}, 'marcia@demo.example.pt', 'Márcia Raposo', 'solicitador', ${hash}) returning id`;
     const [carolina] = await tx<{ id: string }[]>`
       insert into users (organization_id, email, name, role, password_hash)
-      values (${orgId}, 'carolina@demo.example.pt', 'Carolina Folgado', 'triagem', ${hash}) returning id`;
-    const U: Record<string, string> = { marcia: adminId, joao: joao.id, carolina: carolina.id };
+      values (${orgId}, 'carolina@demo.example.pt', 'Carolina Folgado', 'solicitador', ${hash}) returning id`;
+    const U: Record<string, string> = { joao: adminId, marcia: marcia.id, carolina: carolina.id };
     const c = { orgId, userId: adminId };
 
     const tipos = Object.fromEntries(
@@ -343,3 +343,4 @@ export async function criarDadosDemo(sql: Sql, palavraPasse: string): Promise<vo
   await criarDemo(sql, palavraPasse);
   await criarSegundoEscritorio(sql, palavraPasse);
 }
+
