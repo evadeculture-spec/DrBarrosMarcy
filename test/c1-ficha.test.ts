@@ -77,7 +77,7 @@ describe("estados validados no servidor", () => {
   it("só marca completo com tudo conferido; triagem não conclui", async () => {
     const { id } = await novoProcesso(e, { tipo: "procuracao" });
     await transicionar(e.triagem, id, "em_conferencia");
-    await expect(transicionar(e.triagem, id, "completo")).rejects.toThrow(/conferidos/);
+    await expect(transicionar(e.triagem, id, "completo")).rejects.toThrow(/validados/);
     const f = (await obterFicha(e.triagem, id))!;
     for (const i of f.itens) await alterarItem(e.triagem, i.id, "conferido");
     await transicionar(e.triagem, id, "completo");
