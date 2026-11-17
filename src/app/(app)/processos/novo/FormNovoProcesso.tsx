@@ -40,9 +40,13 @@ export function FormNovoProcesso({
   // Vindo da ficha de um cliente, esse cliente prevalece sobre o rascunho.
   const f = clienteInicial ? { ...rascunho, modoCliente: "existente", clienteId: rascunho.clienteId || clienteInicial } : rascunho;
   const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const visiveis = clientes
-    .filter((c) => !filtro || norm(`${c.name} ${c.reference} ${c.city ?? ""} ${c.email ?? ""}`).includes(norm(filtro)) || c.id === f.clienteId)
+  const palavras = norm(filtro).split(/\s+/).filter(Boolean);
+  const filtrados = clientes
+    .filter((c) => palavras.every((w) => norm(`${c.name} ${c.reference} ${c.city ?? ""} ${c.email ?? ""}`).includes(w)))
     .slice(0, 60);
+  // O cliente escolhido (ex.: vindo da ficha) está sempre na lista.
+  const escolhido = clientes.find((c) => c.id === f.clienteId);
+  const visiveis = escolhido && !filtrados.includes(escolhido) ? [escolhido, ...filtrados] : filtrados;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setValor({ ...f, [k]: e.target.value });
 

@@ -3,14 +3,19 @@ import { expect, test } from "@playwright/test";
 import { entrar } from "./ajuda";
 
 /** Verificação automática WCAG 2.1 A/AA (contraste, etiquetas, ARIA) nos ecrãs principais. */
-const ECRAS = ["/hoje", "/triagem", "/processos", "/processos/novo", "/modelos", "/configuracoes", "/pesquisa?q=Rui"];
+const ECRAS = [
+  "/dashboard", "/indicadores/parados", "/processos", "/processos/novo", "/clientes", "/clientes?q=ines",
+  "/clientes/novo", "/tarefas", "/documentos", "/documentos?separador=rececao", "/templates", "/importar",
+  "/configuracoes", "/pesquisa?q=ines",
+];
 
 for (const largura of [1280, 768, 375]) {
   test(`sem violações WCAG AA a ${largura}px`, async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: largura, height: 900 });
     await entrar(page, "joao@demo.example.pt");
     const urls = [...ECRAS];
-    await page.goto("/processos?q=Rui");
+    await page.goto("/processos?q=Rui Fonseca");
     await page.getByRole("link", { name: /Rui Fonseca/ }).click();
     await page.waitForURL(/\/processos\/[0-9a-f-]{36}/);
     urls.push(new URL(page.url()).pathname);

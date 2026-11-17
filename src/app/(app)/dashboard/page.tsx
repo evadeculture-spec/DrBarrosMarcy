@@ -54,7 +54,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </Link>
       </header>
 
-      <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+      <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         <StatCard label="Processos ativos" value={c.ativos} icon={FolderOpen} href={INDICADORES.ativos.href} descricao={INDICADORES.ativos.definicao} />
         <StatCard label="Prazos hoje" value={c.prazos_hoje} icon={CalendarClock} tone={c.prazos_hoje > 0 ? "warning" : "default"} href={INDICADORES.prazos_hoje.href} descricao={INDICADORES.prazos_hoje.definicao} />
         <StatCard label="Prazos vencidos" value={c.prazos_vencidos} icon={AlertTriangle} tone={c.prazos_vencidos > 0 ? "danger" : "success"} href={INDICADORES.prazos_vencidos.href} descricao={INDICADORES.prazos_vencidos.definicao} />

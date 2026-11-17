@@ -133,7 +133,7 @@ export function Ficha({
       {/* Faixa: o que falta, quem age, desde quando. Só o texto fica fixo. */}
       <section
         aria-labelledby="faixa-titulo"
-        className="sticky top-16 z-10 -mx-4 mt-4 border-y border-border bg-surface/95 px-4 py-3 shadow-card backdrop-blur sm:mx-0 sm:rounded-2xl sm:border"
+        className="sticky top-16 z-10 -mx-3 mt-4 border-y border-border bg-surface/95 px-3 py-3 shadow-card backdrop-blur sm:mx-0 sm:rounded-2xl sm:border"
       >
         <h2 id="faixa-titulo" className="sr-only">Situação do processo</h2>
         <p data-testid="faixa" className="text-sm leading-relaxed text-ink sm:text-base">

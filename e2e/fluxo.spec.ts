@@ -3,7 +3,7 @@ import { entrar } from "./ajuda";
 
 test("triagem: associar um anexo com sugestão e anular", async ({ page }) => {
   await entrar(page, "carolina@demo.example.pt");
-  await page.getByRole("link", { name: "Triagem" }).click();
+  await page.goto("/documentos?separador=rececao");
   const cartao = page.locator("li", { hasText: "Cartao_cidadao_Joaquim_Pires.pdf" }).first();
   await expect(cartao.getByLabel("Processo")).toHaveValue(/.+/); // sugestão pré-selecionada
   await cartao.getByLabel("Documento").selectOption({ label: "Documento de identificação do mandante (em falta)" });
@@ -33,7 +33,7 @@ test("pedido: falha simulada, reenvio, a bola passa ao cliente e sai de Hoje", a
   await page.getByRole("tab", { name: "Histórico" }).click();
   await expect(page.getByText(/^Pedido enviado para ana\.lemos@example\.pt/)).toHaveCount(1);
 
-  await page.goto("/hoje");
+  await page.goto("/dashboard?tudo=1");
   await expect(page.getByText("Conferir documentos de Ana Sofia Lemos")).toHaveCount(0);
 });
 
@@ -41,12 +41,14 @@ test("retoma: reabrir o processo volta ao separador onde se estava", async ({ pa
   await entrar(page, "marcia@demo.example.pt");
   await page.goto("/processos?q=Fernando");
   await page.getByRole("link", { name: /Fernando Batista/ }).click();
-  await page.getByRole("tab", { name: "Prazos e seguimento" }).click();
-  await expect(page.getByRole("tab", { name: "Prazos e seguimento" })).toHaveAttribute("aria-selected", "true");
-  await page.waitForTimeout(300);
-  await page.goto("/hoje");
-  await page.getByRole("link", { name: /Continuar em/ }).click();
-  await expect(page.getByRole("tab", { name: "Prazos e seguimento" })).toHaveAttribute("aria-selected", "true");
+  await page.waitForURL(/\/processos\/[0-9a-f-]{36}/);
+  const url = new URL(page.url()).pathname;
+  await page.getByRole("tab", { name: "Prazos" }).click();
+  await expect(page.getByRole("tab", { name: "Prazos" })).toHaveAttribute("aria-selected", "true");
+  await page.waitForTimeout(400);
+  await page.goto("/dashboard");
+  await page.goto(url);
+  await expect(page.getByRole("tab", { name: "Prazos" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("teclado: saltar para o conteúdo e navegar nos separadores com setas", async ({ page }) => {
@@ -57,22 +59,22 @@ test("teclado: saltar para o conteúdo e navegar nos separadores com setas", asy
   await page.getByRole("link", { name: /Rui Fonseca/ }).click();
   await page.getByRole("tab", { name: "Documentos" }).focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Pedido ao cliente" })).toBeFocused();
-  await expect(page.getByRole("tab", { name: "Pedido ao cliente" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Tarefas" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "Tarefas" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("entrada rápida da demonstração: um clique, sem palavra-passe", async ({ page }) => {
   await page.goto("/entrar");
   await page.getByRole("button", { name: /João Barros/ }).click();
-  await expect(page).toHaveURL(/\/hoje$/);
-  await expect(page.getByText("João Barros")).toBeVisible();
-  await expect(page.getByText(/Administrador ·/)).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { name: /, João$/ })).toBeVisible();
 });
 
 test("menu mostra «Solicitadora» para a Márcia Raposo", async ({ page }) => {
   await page.goto("/entrar");
   await page.getByRole("button", { name: /Márcia Raposo/ }).click();
-  await expect(page).toHaveURL(/\/hoje$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("button", { name: /Utilizador: Márcia Raposo/ }).click();
   await expect(page.getByText(/^Solicitadora ·/)).toBeVisible();
 });
 

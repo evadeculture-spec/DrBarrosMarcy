@@ -5,6 +5,7 @@ const NORTE = "http://norte.localhost:3100";
 
 test("critério 1: quem nunca abriu o processo lê na faixa o que falta e quem age", async ({ page }) => {
   await entrar(page, "carolina@demo.example.pt");
+  await page.goto("/processos?q=Rui Fonseca");
   await page.getByRole("link", { name: /Rui Fonseca/ }).first().click();
   const faixa = page.getByTestId("faixa");
   await expect(faixa).toHaveText(
@@ -25,6 +26,7 @@ test("critério 1: processo à espera do cliente diz que é o cliente quem age",
 test("critério 5: o escritório Norte não acede a nada do Demo", async ({ page, browser }) => {
   // Recolher ids reais do escritório Demo.
   await entrar(page, "joao@demo.example.pt");
+  await page.goto("/processos?q=Rui Fonseca");
   await page.getByRole("link", { name: /Rui Fonseca/ }).first().click();
   await page.waitForURL(/\/processos\/[0-9a-f-]{36}/);
   const urlProcesso = new URL(page.url()).pathname;
@@ -53,7 +55,9 @@ test("critério 5: o escritório Norte não acede a nada do Demo", async ({ page
   expect(r?.status()).toBe(404);
   // Pesquisa
   await p2.goto(`${NORTE}/pesquisa?q=Rui`);
-  await expect(p2.getByText("Sem resultados para «Rui».")).toBeVisible();
+  await expect(p2.getByText(/Sem resultados para «Rui»/)).toBeVisible();
+  await p2.goto(`${NORTE}/clientes?q=ines`);
+  await expect(p2.getByText(/Nenhum cliente corresponde/)).toBeVisible();
   // Exportação
   const exp = await p2.goto(`${NORTE}/api/exportar/processo/${urlProcesso.split("/").pop()}`);
   expect(exp?.status()).toBe(404);
@@ -62,6 +66,7 @@ test("critério 5: o escritório Norte não acede a nada do Demo", async ({ page
 
 test("sem sessão não se descarrega nenhum anexo", async ({ page, browser }) => {
   await entrar(page, "joao@demo.example.pt");
+  await page.goto("/processos?q=Rui Fonseca");
   await page.getByRole("link", { name: /Rui Fonseca/ }).first().click();
   const href = await page.locator('a[href^="/api/anexos/"]').first().getAttribute("href");
   const anonimo = await browser.newContext();
